@@ -36,6 +36,21 @@ def get_synopsis_embeddings(csv_path, output_file):
     np.save(output_file, embeddings)
     return embeddings
 
+def stats_of_embedding(embeddings):
+    print("Stats of first 10 vectors:")
+    total_sum = 0
+    size = list(embeddings)[1]
+    for idx, e in enumerate(embeddings):
+        sum = e.sum()
+        if(idx < 10):
+            print(f"vector {idx}: \n")
+            print(f"\t shape of vector: {e.size}")
+            print(f"\t vector zeros dimension:{e.size() - e.nonzero()} ")
+            print(f"\t vector maximum value: {e.max()}")
+            print(f"\t vector minimum value: {e.min()}")
+            print(f"\t sum of all the dimension of the vector: {sum}")
+        total_sum += sum
+    print(f"average sum of dimension of all the vectors : {total_sum/ size}")
 
 def get_poster_embeddings(image_dir, output_file):
     """Loads existing DINO embeddings or generates them from image folder."""
