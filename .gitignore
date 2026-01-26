@@ -3,6 +3,10 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+dataset/
+Var/
+MyAnimeList-Database/
+
 # C extensions
 *.so
 

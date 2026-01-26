@@ -25,8 +25,7 @@ class DinoRecommender:
                 f"Invalid model_size. Choose from: {list(model_map.keys())}")
 
         # Load model from PyTorch Hub
-        self.model = torch.hub.load(
-            'facebookresearch/dinov2', model_map[model_size])
+        self.model = torch.hub.load('facebookresearch/dinov2', model_map[model_size])
         self.model.to(self.device)
         self.model.eval()  # Set to evaluation mode (essential for deterministic output)
 
@@ -94,29 +93,30 @@ class DinoRecommender:
 
         return np.vstack(features_list)
 
-    def find_similar(self, query_embedding, database_embeddings, k=5):
-        """
-        Finds the top k most similar images from the database using Cosine Similarity.
 
-        Args:
-            query_embedding (np.array): Shape (1, dim) - The image you want recommendations for.
-            database_embeddings (np.array): Shape (N, dim) - The catalog of all item embeddings.
-            k (int): Number of recommendations to return.
+def find_similar(query_embedding, database_embeddings, k=5):
+    """
+    Finds the top k most similar images from the database using Cosine Similarity.
 
-        Returns:
-            indices (np.array): Indices of the top k items in the database.
-            scores (np.array): Similarity scores (0 to 1).
-        """
-        # Compute Cosine Similarity
-        # Result shape: (1, N_database_items)
-        similarities = cosine_similarity(
-            query_embedding.reshape(1, -1), database_embeddings)
+    Args:
+        query_embedding (np.array): Shape (1, dim) - The image you want recommendations for.
+        database_embeddings (np.array): Shape (N, dim) - The catalog of all item embeddings.
+        k (int): Number of recommendations to return.
 
-        # Get top K indices (sorted descending)
-        top_k_indices = similarities[0].argsort()[-k:][::-1]
-        top_k_scores = similarities[0][top_k_indices]
+    Returns:
+        indices (np.array): Indices of the top k items in the database.
+        scores (np.array): Similarity scores (0 to 1).
+    """
+    # Compute Cosine Similarity
+    # Result shape: (1, N_database_items)
+    similarities = cosine_similarity(
+        query_embedding.reshape(1, -1), database_embeddings)
 
-        return top_k_indices, top_k_scores
+    # Get top K indices (sorted descending)
+    top_k_indices = similarities[0].argsort()[-k:][::-1]
+    top_k_scores = similarities[0][top_k_indices]
+
+    return top_k_indices, top_k_scores
 
 
 # --- Example Usage ---
@@ -156,7 +156,7 @@ if __name__ == "__main__":
                         query_tensor.to(recommender.device)).cpu().numpy()
 
                 # Find recommendations
-                indices, scores = recommender.find_similar(
+                indices, scores = find_similar(
                     query_embedding, catalog_embeddings, k=3)
 
                 print("\nTop 3 Recommendations:")
