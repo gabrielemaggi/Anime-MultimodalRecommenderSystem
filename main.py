@@ -1,85 +1,124 @@
 import os
+from pathlib import Path
 
+import numpy as np
+import pandas as pd
+
+# Environment setup
 os.environ["USE_TF"] = "0"
 os.environ["USE_TORCH"] = "1"
 os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "true"
 
-import sys
-import pandas as pd
-import numpy as np
 from SynopsisEncoder import *
 from visual_embedding import *
 
 
-def find_similar(query_embedding, database_embeddings, k=5):
-    """
-    Finds the top k most similar images from the database using Cosine Similarity.
+# --- FUNCTIONS ---
+def get_synopsis_embeddings(csv_path, output_file):
+    """Loads existing BERT embeddings or generates them from CSV."""
+    if os.path.exists(output_file):
+        print(f"Found existing synopsis embeddings at {output_file}. Loading...")
+        return np.load(output_file)
 
-    Args:
-        query_embedding (np.array): Shape (1, dim) - The image you want recommendations for.
-        database_embeddings (np.array): Shape (N, dim) - The catalog of all item embeddings.
-        k (int): Number of recommendations to return.
+    if not os.path.exists(csv_path):
+        print(f"Error: {csv_path} not found. Cannot generate embeddings.")
+        return None
 
-    Returns:
-        indices (np.array): Indices of the top k items in the database.
-        scores (np.array): Similarity scores (0 to 1).
-    """
-    # Compute Cosine Similarity
-    # Result shape: (1, N_database_items)
-    similarities = cosine_similarity(
-        query_embedding.reshape(1, -1), database_embeddings)
-
-    # Get top K indices (sorted descending)
-    top_k_indices = similarities[0].argsort()[-k:][::-1]
-    top_k_scores = similarities[0][top_k_indices]
-
-    return top_k_indices, top_k_scores
-
-
-def stats_of_embedding(embeddings):
-    print("Stats of first 10 vectors:")
-    total_sum = 0
-    size = list(embeddings)[1]
-    for idx, e in enumerate(embeddings):
-        sum = e.sum()
-        if(idx < 10):
-            print(f"vector {idx}: \n")
-            print(f"\t shape of vector: {e.size}")
-            print(f"\t vector zeros dimension:{e.size() - e.nonzero()} ")
-            print(f"\t vector maximum value: {e.max()}")
-            print(f"\t vector minimum value: {e.min()}")
-            print(f"\t sum of all the dimension of the vector: {sum}")
-        total_sum += sum
-    print(f"average sum of dimension of all the vectors : {total_sum/ size}")
-
-
-if __name__ == "__main__":
-    data = pd.read_csv("AnimeList.csv", sep= ',')
-    # data_sample = data.head(5)
-
-    output_file = "anime_syno_embeddings.npy"
+    print(f"Generating new synopsis embeddings from {csv_path}...")
+    data = pd.read_csv(csv_path)
     encoder = BertEncoder()
 
-    if not(os.path.exists(output_file)):
-        column_name = 'sypnopsis'
-        data[column_name] = data[column_name].fillna("No description available").astype(str)
-        sentences = data[column_name].tolist()
-        embeddings = encoder.run_model_batch(sentences, batch_size=64)
-    else:
-        embeddings = np.load(output_file)
-
-    query_sentence = "Joutarou Kuujou and his allies have finally made it to Egypt, where the immortal Dio awaits. Upon their arrival, the group gains a new comrade: Iggy, a mutt who wields the Stand \"The Fool.\" It's not all good news however, as standing in their path is a new group of Stand users who serve Dio, each with a Stand representative of an ancient Egyptian god. As their final battle approaches, it is a race against time to break Joutarou's mother free from her curse and end Dio's reign of terror over the Joestar family once and for all."
-
-    print(query_sentence)
-    query = encoder.run_model(query_sentence)
-
-    indices, scores = find_similar(query, embeddings, k=5)
-
-    print("\nTop 5 Recommendations:")
-    for idx, score in zip(indices, scores):
-        print(f"Item: {data.iloc[idx]['sypnopsis']} | Similarity: {score:.4f}")
-
-    print(f"Data Shape: {data.shape}")
-    print(f"Embeddings Shape: {embeddings.shape}")
+    sentences = (
+        data["sypnopsis"].fillna("No description available").astype(str).tolist()
+    )
+    embeddings = encoder.run_model_batch(sentences, batch_size=64)
 
     np.save(output_file, embeddings)
+    return embeddings
+
+
+def get_poster_embeddings(image_dir, output_file):
+    """Loads existing DINO embeddings or generates them from image folder."""
+    if os.path.exists(output_file):
+        print(f"Found existing poster embeddings at {output_file}. Loading...")
+        return np.load(output_file)
+
+    if not os.path.exists(image_dir):
+        print(f"Error: {image_dir} not found. Cannot generate embeddings.")
+        return None
+
+    print(f"Generating new poster embeddings from {image_dir}...")
+    dino = DinoRecommender(model_size="small")
+    folder_path = Path(image_dir)
+    valid_extensions = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
+
+    catalog_images = [
+        str(f) for f in folder_path.iterdir() if f.suffix.lower() in valid_extensions
+    ]
+
+    if not catalog_images:
+        print("No valid images found.")
+        return None
+
+    embeddings = dino.extract_features(catalog_images)
+    np.save(output_file, embeddings)
+    return embeddings
+
+
+def get_recommendations(query_embedding, database_embeddings, data, top_k=5):
+    """
+    Computes similarity and prints the most similar items from the dataframe.
+    """
+    # Reshape query to (1, dim) if it's a flat vector
+    query_vec = query_embedding.reshape(1, -1)
+
+    # Calculate Cosine Similarity
+    # Result: (1, N) where N is number of items in database
+    scores = cosine_similarity(query_vec, database_embeddings)[0]
+
+    # Get indices of top_k highest scores
+    top_indices = scores.argsort()[-top_k:][::-1]
+
+    results = []
+    for idx in top_indices:
+        results.append(
+            {
+                "id": idx,
+                "score": scores[idx],
+                "sypnopsis": data.iloc[idx]["sypnopsis"],
+                "title": data.iloc[idx].get(
+                    "title", f"Item {idx}"
+                ),  # Fallback if title column exists
+            }
+        )
+
+    return results
+
+
+# --- MAIN ---
+
+if __name__ == "__main__":
+    csv_file = "AnimeList.csv"
+    data = pd.read_csv(csv_file)
+
+    # Skip generation if the .npy files exist
+    syno_embeddings = get_synopsis_embeddings(
+        csv_path="AnimeList.csv", output_file="anime_syno_embeddings.npy"
+    )
+
+    poster_embeddings = get_poster_embeddings(
+        image_dir="./dataset/images/", output_file="anime_poster_embeddings.npy"
+    )
+
+    print("\nProcessing complete.")
+    if syno_embeddings is not None:
+        query_vec = syno_embeddings[0]
+
+        recommendations = get_recommendations(query_vec, syno_embeddings, data, top_k=5)
+
+        print("\n--- Results ---")
+        for i, rec in enumerate(recommendations, 1):
+            print(f"{i}. [ID: {rec['id']}].")
+            print(f"   Score: {rec['score']:.4f}].")
+            print(f"   Synopsis: {rec['sypnopsis']}.\n")
+            print(f"   Title: {rec['title']}.\n")
