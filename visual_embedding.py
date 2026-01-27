@@ -2,6 +2,7 @@ import torch
 import torchvision.transforms as T
 from PIL import Image
 import numpy as np
+from pathlib import Path
 from sklearn.metrics.pairwise import cosine_similarity
 
 
@@ -123,6 +124,7 @@ def find_similar(query_embedding, database_embeddings, k=5):
 if __name__ == "__main__":
     # 1. Initialize Recommender
     recommender = DinoRecommender(model_size='small')
+    out_file = "visual_embeddings.npy"
 
     # 2. Database of n_images
     folder_path = Path("./dataset/images/")
@@ -139,6 +141,8 @@ if __name__ == "__main__":
 
         print("\n--- Extracting Catalog Features ---")
         catalog_embeddings = recommender.extract_features(catalog_images)
+
+        np.save(out_file, catalog_embeddings)
 
         if len(catalog_embeddings) > 0:
             # (5, 384) for small model
