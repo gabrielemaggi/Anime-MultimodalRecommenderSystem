@@ -107,7 +107,7 @@ print("Training Node2Vec model... (This might take a moment)")
 # dimensions: size of the vector (64 or 128 is usually good for this size)
 # walk_length: how deep the random walk goes
 # num_walks: how many times it walks from each node
-node2vec = Node2Vec(G, dimensions=64, walk_length=10, num_walks=20, workers=12, weight_key='weight')
+node2vec = Node2Vec(G, dimensions=384, walk_length=30, num_walks=100, workers=12, weight_key='weight')
 
 # Fit the model (train it)
 model = node2vec.fit(window=10, min_count=1, batch_words=4)
