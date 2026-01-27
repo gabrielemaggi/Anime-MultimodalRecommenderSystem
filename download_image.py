@@ -13,7 +13,7 @@ ids = dataset["anime_id"]
 links = dataset["image_url"]
 
 # search for null data
-print(f"There are null ids? {dataset["anime_id"].isnull().any()}")
+print(f"There are null ids? {dataset['anime_id'].isnull().any()}")
 print(f"There are null links? {dataset['image_url'].isnull().any()}")
 print("-"*50)
 
@@ -29,7 +29,7 @@ print(f"Number of null links: {len(image_urls_index)}")
 print("-"*50)
 print(f"index | anime_id | image_url")
 for index in image_urls_index:
-    print(f"{index} | {dataset.loc[index]["anime_id"]} | {dataset.loc[index]["image_url"]}")
+    print(f"{index} | {dataset.loc[index]['anime_id']} | {dataset.loc[index]['image_url']}")
 print("-"*50)
 
 # drop null data

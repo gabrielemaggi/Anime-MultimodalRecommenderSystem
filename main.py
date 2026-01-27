@@ -52,8 +52,24 @@ def stats_of_embedding(embeddings):
         total_sum += sum
     print(f"average sum of dimension of all the vectors : {total_sum/ size}")
 
+#checking cosine simularite between the geners in order to check if bert is a good option to embed ganers
+def check_ganer_by_sBert():
+    ganers = ["Action", "Adventure", "Comedy", "Drama", "Fantasy", "Slice of Life", "Romance", "Sci-Fi", "Shounen",
+              "Seinen", "Shoujo", "Josei", "Isekai", "Mecha", "Psychological", "Horror", "Mystery", "Sports",
+              "Supernatural", "Historical", "Music", "Thriller", "School", "Ecchi", "Harem", "Military", "Space",
+              "Parody", "Samurai", "Magic", "Demons", "Vampire", "Police", "Martial Arts", "Game"]
+    encoder = BertEncoder()
+    embeddings = encoder.run_model_batch(ganers, batch_size=64)
+    similarities = encoder.model.similarity(embeddings, embeddings)
+    similarity_df = pd.DataFrame(similarities, columns=ganers, index=ganers)
+    similarity_df.to_csv("similarity_matrix.csv")
+
 
 if __name__ == "__main__":
+
+
+    #check_ganer_by_sBert() # check semantic similarity betwwen all the ganers to check if it can be a good model to embad the ganers
+
     data = pd.read_csv("AnimeList.csv", sep= ',')
     # data_sample = data.head(5)
 
@@ -83,3 +99,5 @@ if __name__ == "__main__":
     print(f"Embeddings Shape: {embeddings.shape}")
 
     np.save(output_file, embeddings)
+
+

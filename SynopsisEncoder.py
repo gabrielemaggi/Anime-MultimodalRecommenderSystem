@@ -3,7 +3,7 @@ import os
 os.environ["USE_TF"] = "0"
 os.environ["USE_TORCH"] = "1"
 os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "true"
-
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import sys
 import pandas as pd
 from sentence_transformers import SentenceTransformer
@@ -14,7 +14,7 @@ class BertEncoder:
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
 
 
-    def getModel():
+    def getModel(self):
         return self.model
 
 
