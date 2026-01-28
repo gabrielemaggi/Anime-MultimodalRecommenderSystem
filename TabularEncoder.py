@@ -5,39 +5,35 @@ import os
 import torch  # Required for .pt files
 from node2vec import Node2Vec
 from gensim.models import KeyedVectors, Word2Vec
+from encoder import*
 
-
-class TabularEmbedder:
-    def __init__(self,
-                 csv_path,
-                 model_path="anime_node2vec_weighted.model",
-                 vectors_path="anime_embeddings_node2vec_weighted.vec",
-                 embedding_dim=384):
-
-        self.csv_path = csv_path
-        self.model_path = model_path
-        self.vectors_path = vectors_path
-        self.embedding_dim = embedding_dim
+class TabularEmbedder(Encoder):
+    def __init__(self, embedding_dim=384):
 
         # Internal state
         self.df = None
         self.G = None
         self.model = None  # Can hold Word2Vec (Gensim) or KeyedVectors
-        self.embeddings_loaded = False
+        # self.embeddings_loaded = False
 
-    def load_data(self):
+    def encode(self, cvs_path):
+        self.__load()
+        self.__build_graph()
+        self.__train_model()
+        return self.return_embeddings()
+        #self.save_model("Embeddings/anime_tabular_model.model", "Embeddings/anime_tabular_embedding.vec")
+
+    def __load(self, filepath):
         """Loads and cleans the DataFrame."""
-        print(f"Loading data from {self.csv_path}...")
-        self.df = pd.read_csv(self.csv_path)
-
+        print(f"Loading data from {filepath}...")
+        self.df = pd.read_csv(filepath)
         if 'genre' in self.df.columns:
             self.df['genre'] = self.df['genre'].fillna('')
         if 'studio' in self.df.columns:
             self.df['studio'] = self.df['studio'].fillna('')
-
         print(f"Data loaded. Rows: {len(self.df)}")
 
-    def build_graph(self):
+    def __build_graph(self):
         """Builds the weighted NetworkX graph."""
         if self.df is None:
             self.load_data()
@@ -81,13 +77,11 @@ class TabularEmbedder:
 
         print(f"Graph Construction Complete! Nodes: {self.G.number_of_nodes()}")
 
-    def train_model(self):
+    def __train_model(self):
         """Trains Node2Vec if the graph is built."""
         if self.G is None:
             raise ValueError("Graph not built. Call build_graph() first.")
-
         print("Training Node2Vec model...")
-
         node2vec = Node2Vec(
             self.G,
             dimensions=self.embedding_dim,
@@ -96,29 +90,24 @@ class TabularEmbedder:
             workers=12,
             weight_key='weight'
         )
-
         self.model = node2vec.fit(window=10, min_count=1, batch_words=4)
-        print("Training complete.")
-        self.embeddings_loaded = True
 
-    def save_model(self):
+
+    def save_model(self, model_path, vector_path):
         """Saves the model in .model, .vec, and .pt formats."""
         if not self.model:
             print("No model to save.")
             return
 
         # 1. Save Gensim Model (.model)
-        print(f"Saving Gensim model to {self.model_path}...")
-        self.model.save(self.model_path)
+        print(f"Saving Gensim model to {model_path}...")
+        self.model.save(model_path)
 
         # 2. Save KeyedVectors format (.vec)
-        print(f"Saving text vectors to {self.vectors_path}...")
-        self.model.wv.save_word2vec_format(self.vectors_path)
+        print(f"Saving text vectors to {vectors_path}...")
+        self.model.wv.save_word2vec_format(vectors_path)
 
-        # Get vectors and vocab
-        vectors = self.model.wv.vectors  # numpy array
-        vocab_list = self.model.wv.index_to_key  # list of words
-
+    # copia in indexing
     def load_embeddings(self):
         """
         Attempts to load existing models in order: .model -> .pt -> .vec
@@ -147,12 +136,37 @@ class TabularEmbedder:
             print("No checkpoints found. Starting training pipeline...")
             self.build_data_and_train()
 
-    def build_data_and_train(self):
-        """Forces full training cycle."""
-        self.load_data()
-        self.build_graph()
-        self.train_model()
-        self.save_model()
+    def return_embeddings(self):
+            """
+            Returns a list of dictionaries mapping IDs to Embeddings.
+            Format: [{"id": row_id, "embedding": np_array}, ...]
+            """
+            # 1. Handle Model Type (Word2Vec wrapper vs KeyedVectors)
+            if self.model is None:
+                return []
+            vectors = self.model.wv if hasattr(self.model, 'wv') else self.model
+            results = []
+            # 2. If DataFrame is loaded, map strictly to Data Rows (Filtering out Genre/Studio nodes)
+            if self.df is not None:
+                for index, row in self.df.iterrows():
+                    # Reconstruct the specific node name used in __build_graph
+                    node_key = f"Anime_{row['title']}"
+
+                    if node_key in vectors:
+                        # Use 'id' column if it exists, otherwise fallback to title
+                        row_id = row['id'] if 'id' in row else row['title']
+
+                        results.append({
+                            "id": row_id,
+                            "embedding": vectors[node_key]  # Add .tolist() here if you need a pure list
+                        })
+            else:
+                for node_key in vectors.index_to_key:
+                    results.append({
+                        "id": node_key,
+                        "embedding": vectors[node_key]
+                    })
+            return results
 
     def recommend(self, anime_title, top_k=5):
         """Finds similar entities."""
