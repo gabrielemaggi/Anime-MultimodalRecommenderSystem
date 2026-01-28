@@ -12,7 +12,7 @@ class Fusion:
         if synopsis_embeddings is None or poster_embeddings is None:
             raise ValueError("synopsis or poster embeddings cannot be None")
 
-        self.embedding_store = [np.asarray(synopsis_embeddings[]), np.asarray(poster_embeddings)]
+        self.embedding_store = [np.asarray(synopsis_embeddings), np.asarray(poster_embeddings)]
 
         # samples in the embeddings
         n_samples = self.embedding_store[0].shape[0]
