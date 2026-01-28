@@ -2,7 +2,6 @@ import numpy as np
 
 
 class Fusion:
-
     def __init__(self, synopsis_embeddings, poster_embeddings, *args):
         """
         :param synopsis_embeddings: embedding of synopses.

@@ -121,7 +121,7 @@ def find_similar(query_embedding, database_embeddings, k=5):
 if __name__ == "__main__":
     # 1. Initialize Recommender
     recommender = VisualEncoder(model_size='small')
-    out_file = "visual_embeddings.npy"
+    out_file = "./Embeddings\VisualEmbeddings.npy"
 
     # 2. Database of n_images
     folder_path = Path("./dataset/images/")

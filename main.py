@@ -10,7 +10,7 @@ os.environ["USE_TORCH"] = "1"
 os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "true"
 
 from SynopsisEncoder import *
-from visual_embedding import *
+from VisualEncoder import *
 
 
 # --- FUNCTIONS ---
@@ -75,7 +75,7 @@ def get_poster_embeddings(image_dir, output_file):
         return None
 
     print(f"Generating new poster embeddings from {image_dir}...")
-    dino = DinoRecommender(model_size="small")
+    dino = VisualEncoder(model_size="small")
     folder_path = Path(image_dir)
     valid_extensions = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
 
@@ -142,7 +142,6 @@ if __name__ == "__main__":
         query_vec = syno_embeddings[0]
 
         recommendations = get_recommendations(query_vec, syno_embeddings, data, top_k=5)
-
 
         print("\n--- Results ---")
         for i, rec in enumerate(recommendations, 1):

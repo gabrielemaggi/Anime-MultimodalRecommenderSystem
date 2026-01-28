@@ -193,7 +193,7 @@ if __name__ == "__main__":
         csv_path=csv_file,
         model_path='anime_node2vec_weighted.model',  # Gensim format
         vectors_path='anime_embeddings.vec',  # Text format
-        embedding_dim=64  # Kept small for faster testing, use 384 for production
+        embedding_dim=384  # Kept small for faster testing, use 384 for production
     )
 
     print("--- 1. STARTING PIPELINE ---")
