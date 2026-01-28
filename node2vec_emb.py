@@ -204,15 +204,3 @@ if __name__ == "__main__":
     print("\n--- 2. TESTING RECOMMENDATIONS ---")
     # Replace 'Naruto' with an actual title from your CSV
     recommender.recommend("Naruto", top_k=5)
-
-    print("\n--- 3. VERIFICATION OF FILES ---")
-    # Let's verify that the .pt file was actually created or exists
-    if os.path.exists("anime_node2vec.pt"):
-        print("SUCCESS: 'anime_node2vec.pt' exists.")
-
-        # Optional: Inspect the .pt content just to be sure
-        data = torch.load("anime_node2vec.pt")
-        print(f"PyTorch Checkpoint Keys: {data.keys()}")
-        print(f"Tensor Shape: {data['vectors'].shape}")
-    else:
-        print("WARNING: 'anime_node2vec.pt' was not found.")
