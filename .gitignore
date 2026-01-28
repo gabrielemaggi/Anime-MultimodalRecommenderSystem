@@ -12,6 +12,8 @@ MyAnimeList-Database/
 
 # dataset nico
 dataset
+anime_poster_embeddings.npy
+anime_syno_embeddings.npy
 
 # Distribution / packaging
 .Python
