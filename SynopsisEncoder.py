@@ -9,7 +9,7 @@ import pandas as pd
 from sentence_transformers import SentenceTransformer
 import numpy as np
 
-class BertEncoder:
+class SynopsisEncoder:
     def __init__(self):
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
 

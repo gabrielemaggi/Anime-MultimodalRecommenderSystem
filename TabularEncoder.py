@@ -7,7 +7,7 @@ from node2vec import Node2Vec
 from gensim.models import KeyedVectors, Word2Vec
 
 
-class AnimeGraphRecommender:
+class TabularEmbedder:
     def __init__(self,
                  csv_path,
                  model_path="anime_node2vec_weighted.model",

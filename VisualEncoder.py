@@ -6,7 +6,7 @@ from pathlib import Path
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-class DinoRecommender:
+class VisualEncoder:
     def __init__(self, model_size='small', device=None):
 
         self.device = device if device else (
@@ -28,10 +28,8 @@ class DinoRecommender:
         # Load model from PyTorch Hub
         self.model = torch.hub.load('facebookresearch/dinov2', model_map[model_size])
         self.model.to(self.device)
-        self.model.eval()  # Set to evaluation mode (essential for deterministic output)
-
+        self.model.eval()
         # Define the standardized DINOv2 preprocessing pipeline
-        # DINOv2 expects images to be multiples of the patch size (14), usually 224x224 or 518x518
         self.transform = T.Compose([
             T.Resize(256, interpolation=T.InterpolationMode.BICUBIC),
             T.CenterCrop(224),
@@ -81,7 +79,6 @@ class DinoRecommender:
 
             with torch.no_grad():
                 # DINOv2 forward pass
-                # .cpu() moves data back to RAM, .numpy() converts to array
                 batch_features = self.model(batch_input).cpu().numpy()
 
             features_list.append(batch_features)
@@ -123,7 +120,7 @@ def find_similar(query_embedding, database_embeddings, k=5):
 # --- Example Usage ---
 if __name__ == "__main__":
     # 1. Initialize Recommender
-    recommender = DinoRecommender(model_size='small')
+    recommender = VisualEncoder(model_size='small')
     out_file = "visual_embeddings.npy"
 
     # 2. Database of n_images

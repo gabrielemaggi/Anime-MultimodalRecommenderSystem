@@ -3,3 +3,4 @@ sentence_transformers
 torch
 torchvision
 transformers
+node2vec
