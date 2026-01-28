@@ -26,7 +26,7 @@ def get_synopsis_embeddings(csv_path, output_file):
 
     print(f"Generating new synopsis embeddings from {csv_path}...")
     data = pd.read_csv(csv_path)
-    encoder = BertEncoder()
+    encoder = SynopsisEncoder()
 
     sentences = (
         data["sypnopsis"].fillna("No description available").astype(str).tolist()
