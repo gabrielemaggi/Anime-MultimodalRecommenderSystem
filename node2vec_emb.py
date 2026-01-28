@@ -12,13 +12,11 @@ class AnimeGraphRecommender:
                  csv_path,
                  model_path="anime_node2vec_weighted.model",
                  vectors_path="anime_embeddings_node2vec_weighted.vec",
-                 pytorch_path="anime_node2vec.pt",
                  embedding_dim=384):
 
         self.csv_path = csv_path
         self.model_path = model_path
         self.vectors_path = vectors_path
-        self.pytorch_path = pytorch_path
         self.embedding_dim = embedding_dim
 
         # Internal state
@@ -117,20 +115,9 @@ class AnimeGraphRecommender:
         print(f"Saving text vectors to {self.vectors_path}...")
         self.model.wv.save_word2vec_format(self.vectors_path)
 
-        # 3. Save PyTorch format (.pt)
-        print(f"Saving PyTorch dictionary to {self.pytorch_path}...")
-
         # Get vectors and vocab
         vectors = self.model.wv.vectors  # numpy array
         vocab_list = self.model.wv.index_to_key  # list of words
-
-        # Create a dictionary payload
-        pt_payload = {
-            'vectors': torch.from_numpy(vectors),  # Convert to Tensor
-            'vocab': vocab_list,
-            'dim': self.embedding_dim
-        }
-        torch.save(pt_payload, self.pytorch_path)
 
     def load_embeddings(self):
         """
@@ -142,24 +129,6 @@ class AnimeGraphRecommender:
             self.model = Word2Vec.load(self.model_path)
             self.embeddings_loaded = True
             return True
-
-        # Priority 2: PyTorch Model
-        elif os.path.exists(self.pytorch_path):
-            print(f"[LOAD] Found {self.pytorch_path}. Loading PyTorch checkpoint...")
-            try:
-                checkpoint = torch.load(self.pytorch_path)
-                vocab = checkpoint['vocab']
-                vectors = checkpoint['vectors'].numpy()  # Convert back to numpy
-
-                # Reconstruct a KeyedVectors object manually so we can use .most_similar()
-                kv = KeyedVectors(checkpoint['dim'])
-                kv.add_vectors(vocab, vectors)
-
-                self.model = kv
-                self.embeddings_loaded = True
-                return True
-            except Exception as e:
-                print(f"Error loading .pt file: {e}")
 
         # Priority 3: Vector File
         elif os.path.exists(self.vectors_path):
@@ -223,7 +192,6 @@ if __name__ == "__main__":
     recommender = AnimeGraphRecommender(
         csv_path=csv_file,
         model_path='anime_node2vec_weighted.model',  # Gensim format
-        pytorch_path='anime_node2vec.pt',  # PyTorch format
         vectors_path='anime_embeddings.vec',  # Text format
         embedding_dim=64  # Kept small for faster testing, use 384 for production
     )
