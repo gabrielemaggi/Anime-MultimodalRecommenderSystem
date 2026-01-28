@@ -189,7 +189,7 @@ if __name__ == "__main__":
     csv_file = 'AnimeList.csv'
 
     # Define the specific filenames you requested
-    recommender = AnimeGraphRecommender(
+    recommender = TabularEmbedder(
         csv_path=csv_file,
         model_path='anime_node2vec_weighted.model',  # Gensim format
         vectors_path='anime_embeddings.vec',  # Text format
