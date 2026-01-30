@@ -32,3 +32,7 @@ class User:
         return self.embeddings
 
 
+if __name__ == "__main__":
+    u = User(2255153)
+    u.findCentersOfClusters()
+    print(u)
