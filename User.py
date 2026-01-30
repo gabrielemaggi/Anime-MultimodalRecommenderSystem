@@ -1,5 +1,6 @@
 import pandas as pd
 from UserDBConnector import UserDBConnector
+from clusterFinder import clusterFinder
 class User:
 
     # get a user from the db
@@ -20,5 +21,14 @@ class User:
     def get_watchList(self):
         return self.watched
 
+    def findCentersOfClusters(self):
+        """
+        set numbers of clusters and return the centers
+        :return:
+        """
+        kmean = clusterFinder(self.watched)
+        self.K = kmean.getK()
+        self.embeddings = kmean.get_centers()
+        return self.embeddings
 
 
