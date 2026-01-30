@@ -1,182 +1,158 @@
 import numpy as np
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union, Tuple
+from collections import defaultdict
 
 class Fusion:
     def __init__(self, anime_embeddings: List[Dict]):
         """
-        Initialize the Fusion class with joint embeddings.
+        Initialize with joint embeddings.
 
-        :param anime_embeddings: List of dicts with structure:
-                                 [{id: [[syn_vec], [vis_vec], [tab_vec]]}, ...]
+        Expected format (flexible):
+          Option A (current): [{id1: [[syn], [vis], [tab]]}, {id2: [[syn], [vis], [tab]]}, ...]
+          Option B (recommended): {id1: [syn, vis, tab], id2: [syn, vis, tab], ...}
         """
-        if anime_embeddings is None or len(anime_embeddings) == 0:
-            raise ValueError("anime_embeddings cannot be None or empty")
+        if not anime_embeddings:
+            raise ValueError("anime_embeddings cannot be empty")
 
-        self.anime_embeddings = anime_embeddings
-        self.n_samples = len(anime_embeddings)
+        # Normalize input to consistent internal format
+        self.item_ids: List[str] = []
+        self.synopsis_embeddings: List[np.ndarray] = []
+        self.visual_embeddings: List[np.ndarray] = []
+        self.tabular_embeddings: List[np.ndarray] = []
 
-        # Get dimensions for validation
-        first_item = list(anime_embeddings[0].values())[0]
-        self.syn_dim = len(first_item[0][0])
-        self.vis_dim = len(first_item[1][0])
-        self.tab_dim = len(first_item[2][0])
+        # Handle both list-of-dicts and flat dict formats
+        if isinstance(anime_embeddings, dict):
+            items = anime_embeddings.items()
+        else:
+            items = []
+            for item_dict in anime_embeddings:
+                if not isinstance(item_dict, dict):
+                    raise TypeError(f"Expected dict, got {type(item_dict)}")
+                if len(item_dict) != 1:
+                    raise ValueError(f"Each dict must have exactly 1 key, got {len(item_dict)}")
+                item_id = next(iter(item_dict.keys()))
+                items.append((item_id, item_dict[item_id]))
 
+        for item_id, embeddings in items:
+            if len(embeddings) != 3:
+                raise ValueError(f"Expected 3 embeddings per item, got {len(embeddings)} for ID {item_id}")
+
+            # Handle double-nested format [[vec]] vs [vec]
+            syn = np.array(embeddings[0][0] if isinstance(embeddings[0], list) and len(embeddings[0]) == 1 else embeddings[0])
+            vis = np.array(embeddings[1][0] if isinstance(embeddings[1], list) and len(embeddings[1]) == 1 else embeddings[1])
+            tab = np.array(embeddings[2][0] if isinstance(embeddings[2], list) and len(embeddings[2]) == 1 else embeddings[2])
+
+            self.item_ids.append(str(item_id))
+            self.synopsis_embeddings.append(syn)
+            self.visual_embeddings.append(vis)
+            self.tabular_embeddings.append(tab)
+
+        # Convert to arrays
+        self.synopsis_embeddings = np.array(self.synopsis_embeddings)
+        self.visual_embeddings = np.array(self.visual_embeddings)
+        self.tabular_embeddings = np.array(self.tabular_embeddings)
+
+        # Build O(1) ID lookup
+        self._id_to_idx = {item_id: i for i, item_id in enumerate(self.item_ids)}
+
+        self.n_samples = len(self.item_ids)
         print(f"Fusion initialized with {self.n_samples} samples")
-        print(f"  Synopsis dim: {self.syn_dim}")
-        print(f"  Visual dim: {self.vis_dim}")
-        print(f"  Tabular dim: {self.tab_dim}")
+        print(f"  Synopsis shape: {self.synopsis_embeddings.shape}")
+        print(f"  Visual shape: {self.visual_embeddings.shape}")
+        print(f"  Tabular shape: {self.tabular_embeddings.shape}")
 
-    def concatenate(self) -> Dict[str, np.ndarray]:
-        """
-        Concatenates all embeddings along feature axis.
-        For each ID: concatenate [syn_vec] + [vis_vec] + [tab_vec]
+    def _get_embedding_dim(self, emb: np.ndarray) -> int:
+        """Safely get feature dimension for 1D or 2D arrays."""
+        return emb.shape[1] if emb.ndim == 2 else emb.shape[0]
 
-        :return: Dict mapping item_id -> concatenated embedding vector
-        """
+    def concatenate(self, as_list: bool = False) -> Union[Dict[str, np.ndarray], List[Dict]]:
         result = {}
+        for i, item_id in enumerate(self.item_ids):
+            result[item_id] = np.concatenate([
+                self.synopsis_embeddings[i],
+                self.visual_embeddings[i],
+                self.tabular_embeddings[i]
+            ])
 
-        for item_dict in self.anime_embeddings:
-            # Get the ID and embeddings
-            item_id = list(item_dict.keys())[0]
-            embeddings = item_dict[item_id]  # [[syn], [vis], [tab]]
+        return [{'id': k, 'embedding': v} for k, v in result.items()] if as_list else result
 
-            # Extract vectors and concatenate
-            syn_vec = np.array(embeddings[0][0])  # From [[syn_vec]]
-            vis_vec = np.array(embeddings[1][0])  # From [[vis_vec]]
-            tab_vec = np.array(embeddings[2][0])  # From [[tab_vec]]
-
-            # Concatenate all three
-            concatenated = np.concatenate([syn_vec, vis_vec, tab_vec])
-            result[item_id] = concatenated
-
-        output_dim = self.syn_dim + self.vis_dim + self.tab_dim
-        print(f"Concatenation complete. Output dim: {output_dim}")
-        return result
-
-    def mean_fusion(self) -> Dict[str, np.ndarray]:
-        """
-        Performs mean fusion by averaging all embeddings.
-        Note: Only works if all embeddings have the same dimension.
-
-        :return: Dict mapping item_id -> mean fused embedding vector
-        """
-        # Check if dimensions are compatible
-        if not (self.syn_dim == self.vis_dim == self.tab_dim):
+    def mean_fusion(self, as_list: bool = False) -> Union[Dict[str, np.ndarray], List[Dict]]:
+        dims = [
+            self._get_embedding_dim(self.synopsis_embeddings),
+            self._get_embedding_dim(self.visual_embeddings),
+            self._get_embedding_dim(self.tabular_embeddings)
+        ]
+        if len(set(dims)) != 1:
             raise ValueError(
-                f"Mean fusion requires all embeddings to have same dimension. "
-                f"Got: Synopsis={self.syn_dim}, Visual={self.vis_dim}, Tabular={self.tab_dim}. "
-                f"Use weighted_average_fusion or concatenate instead."
+                f"Mean fusion requires equal dimensions. Got: synopsis={dims[0]}, "
+                f"visual={dims[1]}, tabular={dims[2]}"
             )
 
         result = {}
-
-        for item_dict in self.anime_embeddings:
-            # Get the ID and embeddings
-            item_id = list(item_dict.keys())[0]
-            embeddings = item_dict[item_id]  # [[syn], [vis], [tab]]
-
-            # Extract vectors
-            syn_vec = np.array(embeddings[0][0])
-            vis_vec = np.array(embeddings[1][0])
-            tab_vec = np.array(embeddings[2][0])
-
-            # Stack and compute mean
-            stacked = np.stack([syn_vec, vis_vec, tab_vec])
+        for i, item_id in enumerate(self.item_ids):
+            stacked = np.stack([
+                self.synopsis_embeddings[i],
+                self.visual_embeddings[i],
+                self.tabular_embeddings[i]
+            ])
             result[item_id] = np.mean(stacked, axis=0)
 
-        print(f"Mean fusion complete. Output dim: {self.syn_dim}")
-        return result
+        return [{'id': k, 'embedding': v} for k, v in result.items()] if as_list else result
 
-    def weighted_average_fusion(self, weights: Optional[List[float]] = None) -> Dict[str, np.ndarray]:
-        """
-        Performs weighted average fusion of all embeddings.
-        Note: Only works if all embeddings have the same dimension.
-
-        :param weights: List of weights [syn_weight, vis_weight, tab_weight].
-                       If None, equal weights [1/3, 1/3, 1/3] are used.
-                       Will be normalized to sum to 1.
-        :return: Dict mapping item_id -> weighted average embedding vector
-        """
-        # Check if dimensions are compatible
-        if not (self.syn_dim == self.vis_dim == self.tab_dim):
+    def weighted_average_fusion(
+        self,
+        weights: Optional[List[float]] = None,
+        as_list: bool = False
+    ) -> Union[Dict[str, np.ndarray], List[Dict]]:
+        dims = [
+            self._get_embedding_dim(self.synopsis_embeddings),
+            self._get_embedding_dim(self.visual_embeddings),
+            self._get_embedding_dim(self.tabular_embeddings)
+        ]
+        if len(set(dims)) != 1:
             raise ValueError(
-                f"Weighted fusion requires all embeddings to have same dimension. "
-                f"Got: Synopsis={self.syn_dim}, Visual={self.vis_dim}, Tabular={self.tab_dim}. "
-                f"Use concatenate instead."
+                f"Weighted fusion requires equal dimensions. Got: synopsis={dims[0]}, "
+                f"visual={dims[1]}, tabular={dims[2]}"
             )
 
-        # Set default equal weights if not provided
         if weights is None:
-            weights = np.array([1/3, 1/3, 1/3])
+            weights = [1/3, 1/3, 1/3]
         else:
-            weights = np.asarray(weights)
             if len(weights) != 3:
-                raise ValueError(f"Expected 3 weights, but got {len(weights)}.")
-            # Normalize weights to sum to 1
-            weights = weights / np.sum(weights)
+                raise ValueError(f"Expected 3 weights, got {len(weights)}")
+            total = sum(weights)
+            if total == 0:
+                raise ValueError("Weights sum to zero")
+            weights = [w / total for w in weights]
 
-        print(f"Using weights: Synopsis={weights[0]:.3f}, Visual={weights[1]:.3f}, Tabular={weights[2]:.3f}")
+        print(f"Using weights: synopsis={weights[0]:.2f}, visual={weights[1]:.2f}, tabular={weights[2]:.2f}")
 
         result = {}
-
-        for item_dict in self.anime_embeddings:
-            # Get the ID and embeddings
-            item_id = list(item_dict.keys())[0]
-            embeddings = item_dict[item_id]  # [[syn], [vis], [tab]]
-
-            # Extract vectors
-            syn_vec = np.array(embeddings[0][0])
-            vis_vec = np.array(embeddings[1][0])
-            tab_vec = np.array(embeddings[2][0])
-
-            # Weighted sum
-            weighted_sum = (
-                weights[0] * syn_vec +
-                weights[1] * vis_vec +
-                weights[2] * tab_vec
+        for i, item_id in enumerate(self.item_ids):
+            result[item_id] = (
+                weights[0] * self.synopsis_embeddings[i] +
+                weights[1] * self.visual_embeddings[i] +
+                weights[2] * self.tabular_embeddings[i]
             )
-            result[item_id] = weighted_sum
 
-        print(f"Weighted fusion complete. Output dim: {self.syn_dim}")
-        return result
+        return [{'id': k, 'embedding': v} for k, v in result.items()] if as_list else result
 
     def get_embedding_by_id(self, item_id: str, modality: str = 'all') -> np.ndarray:
-        """
-        Retrieve embedding for a specific item directly from anime_embeddings.
+        if item_id not in self._id_to_idx:
+            raise ValueError(f"Item ID '{item_id}' not found. Available IDs: {list(self._id_to_idx.keys())[:5]}...")
 
-        :param item_id: The ID of the item
-        :param modality: 'synopsis', 'visual', 'tabular', or 'all' (concatenated)
-        :return: The requested embedding vector
-        """
-        # Find the item in anime_embeddings
-        item_embeddings = None
-        for item_dict in self.anime_embeddings:
-            if item_id in item_dict:
-                item_embeddings = item_dict[item_id]
-                break
-
-        if item_embeddings is None:
-            raise ValueError(f"Item ID {item_id} not found in embeddings")
-
-        # Extract based on modality
+        idx = self._id_to_idx[item_id]
         if modality == 'synopsis':
-            return np.array(item_embeddings[0][0])
+            return self.synopsis_embeddings[idx]
         elif modality == 'visual':
-            return np.array(item_embeddings[1][0])
+            return self.visual_embeddings[idx]
         elif modality == 'tabular':
-            return np.array(item_embeddings[2][0])
+            return self.tabular_embeddings[idx]
         elif modality == 'all':
-            syn_vec = np.array(item_embeddings[0][0])
-            vis_vec = np.array(item_embeddings[1][0])
-            tab_vec = np.array(item_embeddings[2][0])
-            return np.concatenate([syn_vec, vis_vec, tab_vec])
+            return np.concatenate([
+                self.synopsis_embeddings[idx],
+                self.visual_embeddings[idx],
+                self.tabular_embeddings[idx]
+            ])
         else:
-            raise ValueError(f"Unknown modality: {modality}. Use 'synopsis', 'visual', 'tabular', or 'all'")
-
-    def get_all_ids(self) -> List[str]:
-        """
-        Get list of all item IDs in the embeddings.
-
-        :return: List of item IDs
-        """
-        return [list(item_dict.keys())[0] for item_dict in self.anime_embeddings]
+            raise ValueError(f"Unknown modality '{modality}'. Choose from: 'synopsis', 'visual', 'tabular', 'all'")

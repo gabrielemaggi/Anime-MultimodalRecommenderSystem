@@ -31,6 +31,7 @@ class Indexing:
         self.fused_embeddings = None;
 
         self.anime_embeddings = None;
+        self.anime_ids = [];
 
         self.synopsis_path = "./Embeddings/anime_syno_embeddings.json"
         self.visual_path = "./Embeddings/anime_poster_embeddings.json"
@@ -43,7 +44,7 @@ class Indexing:
         self.dataset = Path("./AnimeList.csv")
 
         # metadata are columns of the DB to be stored in the vector db
-        self.AM = ['id', 'title', 'title_english', 'title_japanese', 'genre', 'sypnopsis']
+        self.AM = ['title', 'title_english', 'title_japanese', 'genre', 'sypnopsis']
         self.vector_db = None
         self.anime_metadata = None
 
@@ -57,7 +58,7 @@ class Indexing:
         else:
             print("Loading existing synopsis embeddings...")
             self.load(self.synopsis_path, type='syn')
-        pass
+
 
     def calculate_visual_embedding(self):
         if not Path(self.visual_path).exists():
@@ -98,51 +99,43 @@ class Indexing:
         self.build_vector_database()
 
 
-    def joint_embeddings(self) -> np.ndarray:
-        """
-        Joins all three embeddings on ID and returns a single matrix.
-        Format: [ID, syn_v1...vN, vis_v1...vN, tab_v1...vN]
-        """
-        # 1. Find the intersection of IDs (only items present in all 3)
-        syn_ids = set(self.synopsis_embeddings.keys())
-        vis_ids = set(self.visual_embeddings.keys())
-        tab_ids = set(self.tabular_embeddings.keys())
+    def joint_embeddings(self) -> dict:
+        # Flatten each list-of-dicts into a single ID->embedding mapping
+        syn_dict = {k: v for d in self.synopsis_embeddings for k, v in d.items()}
+        vis_dict = {k: v for d in self.visual_embeddings for k, v in d.items()}
+        tab_dict = {k: v for d in self.tabular_embeddings for k, v in d.items()}
 
-        common_ids = sorted(list(syn_ids & vis_ids & tab_ids))
-
+        # Find IDs present in all three embedding sets
+        common_ids = sorted(set(syn_dict.keys()) & set(vis_dict.keys()) & set(tab_dict.keys()))
         if not common_ids:
             raise ValueError("No common IDs found across all embedding sets.")
 
-        joined_data = []
+        # Build joint dictionary: {id: [synopsis_embedding, visual_embedding, tabular_embedding]}
+        joint_dict = {
+            item_id: [
+                syn_dict[item_id],  # Synopsis embedding (preserved as-is)
+                vis_dict[item_id],  # Visual embedding (preserved as-is)
+                tab_dict[item_id]   # Tabular embedding (preserved as-is)
+            ]
+            for item_id in common_ids
+        }
 
-        for item_id in common_ids:
-            # Extract the vectors
-            syn_vec = self.synopsis_embeddings[item_id] # (D1,)
-            vis_vec = self.visual_embeddings[item_id]   # (D2,)
-            tab_vec = self.tabular_embeddings[item_id]   # (D3,)
+        # Store results as instance attributes
+        self.anime_ids = common_ids
+        self.anime_embeddings = joint_dict
 
-            # Combine: [id] + syn + vis + tab
-            # np.concatenate requires all arrays to be the same dimension
-            # id: [[syn], [vis]. [tab]]
-            combined_row = {item_id: [[syn_vec], [vis_vec], [tab_vec]]}
-            joined_data.append(combined_row)
+        return joint_dict
 
-        self.anime_embeddings = np.array(joined_data)
 
     def fuse(self, method='weighted', weights: Optional[List[float]] = None):
-
         fusion_engine = Fusion(
             (self.anime_embeddings)
         )
-
         print(f"Esecuzione fusione con metodo: {method}...")
-
         if method == 'mean':
             self.fused_embeddings = fusion_engine.mean_fusion()
-
         elif method == 'concatenate':
             self.fused_embeddings = fusion_engine.concatenate()
-
         elif method == 'weighted':
             # If you don't weight use a balanced weight
             if weights is None:
@@ -150,7 +143,6 @@ class Indexing:
             self.fused_embeddings = fusion_engine.weighted_average_fusion(weights=weights)
         else:
             raise ValueError(f"Metodo di fusione {method} non supportato.")
-        print(f"Fusione completata. Shape finale: {self.fused_embeddings.shape}")
         return self.fused_embeddings
 
 
@@ -158,9 +150,7 @@ class Indexing:
         directory = os.path.dirname(path)
         if directory and not os.path.exists(directory):
             os.makedirs(directory)
-
         self.save_vector_db()
-
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(embeddings, f, indent=4)
 
@@ -229,24 +219,106 @@ class Indexing:
 
     # Vector Database Functions
     def build_vector_database(self):
-        """Build vector database from embeddings"""
+        """
+        Builds the vector database by aligning fused embeddings with metadata.
 
-        # Load anime metadata
-        df = pd.read_csv(self.dataset)
-        self.anime_metadata = df[self.AM].to_dict('records')
+        Requirements:
+          - self.dataset: Path to CSV with anime metadata
+          - self.fused_embeddings: Dict {anime_id: embedding_vector}
+          - self.anime_ids: List of anime IDs in embedding order (from fusion step)
+          - self.AM: List of metadata column names to include (e.g., ['title', 'genre', 'rating'])
+        """
+        # 1. Validate prerequisites
+        if not hasattr(self, 'fused_embeddings') or self.fused_embeddings is None:
+            raise ValueError(
+                "No fused embeddings available. Run fusion step first (e.g., fusion.concatenate())."
+            )
 
-        # Choose which embeddings to use
-        if self.fused_embeddings is not None:
-            embeddings = np.array(self.fused_embeddings)
-        else:
-            raise ValueError("No fused embeddings available")
-        # Initialize vector database
-        dimension = embeddings.shape[1]
-        self.vector_db = VectorDatabase(dimension)
-        # Add vectors
-        print(f"Adding {len(embeddings)} vectors to database...")
-        self.vector_db.add_vectors(embeddings, self.anime_metadata)
-        print("Vector database built successfully!")
+        if not hasattr(self, 'anime_ids') or not self.anime_ids:
+            raise ValueError(
+                "anime_ids not found. Ensure fusion step populated this attribute."
+            )
+
+        if not hasattr(self, 'AM') or not self.AM:
+            raise ValueError(
+                "Metadata columns (self.AM) not defined. Set e.g., self.AM = ['title', 'genre', 'episodes']"
+            )
+
+        # 2. Load dataset
+        try:
+            df = pd.read_csv(self.dataset)
+        except Exception as e:
+            raise IOError(f"Failed to load dataset from {self.dataset}: {e}")
+
+        # 3. Validate ID column (support both 'id' and 'anime_id')
+        id_col = 'id' if 'id' in df.columns else ('anime_id' if 'anime_id' in df.columns else None)
+        if id_col is None:
+            raise ValueError(
+                f"Dataset must contain 'id' or 'anime_id' column. Found columns: {list(df.columns)}"
+            )
+
+        # 4. Build metadata lookup (O(1) access)
+        # Convert ID column to string for consistent matching
+        df[id_col] = df[id_col].astype(str)
+        available_cols = [col for col in self.AM if col in df.columns]
+        if not available_cols:
+            raise ValueError(
+                f"None of the requested metadata columns {self.AM} found in dataset. "
+                f"Available columns: {list(df.columns)}"
+            )
+
+        metadata_lookup = df.set_index(id_col)[available_cols].to_dict('index')
+        print(f"Loaded metadata for {len(metadata_lookup)} items from {self.dataset}")
+
+        # 5. Align embeddings with metadata in consistent order
+        embedding_list = []
+        metadata_list = []
+        missing_metadata = []
+
+        for anime_id in self.anime_ids:
+            str_id = str(anime_id)
+
+            # Get embedding (handle both dict and list formats)
+            if isinstance(self.fused_embeddings, dict):
+                emb = self.fused_embeddings.get(str_id)
+            else:  # list of dicts format
+                emb = next((item[str_id] for item in self.fused_embeddings if str_id in item), None)
+
+            if emb is None:
+                raise ValueError(f"Embedding not found for anime ID {str_id}")
+
+            # Get metadata
+            meta = metadata_lookup.get(str_id)
+            if meta is None:
+                missing_metadata.append(str_id)
+                meta = {"id": str_id, "title": "Unknown", "_warning": "Metadata missing"}
+            else:
+                meta = meta.copy()  # Avoid mutating original
+                meta["id"] = str_id
+
+            # Convert embedding to numpy array if needed
+            if not isinstance(emb, np.ndarray):
+                emb = np.array(emb).flatten()
+
+            embedding_list.append(emb)
+            metadata_list.append(meta)
+
+        # 6. Warn about missing metadata
+        if missing_metadata:
+            print(f"⚠️ Warning: {len(missing_metadata)} items missing metadata: {missing_metadata[:5]}...")
+
+        # 7. Create embedding matrix
+        embeddings_matrix = np.array(list(self.fused_embeddings.values()), dtype='float32')  # ← LINE 1
+        dimension = embeddings_matrix.shape[1]
+        self.vector_db = VectorDatabase(dimension, distance="cosine")
+        self.vector_db.add_vectors(embeddings_matrix, self.anime_metadata)  # ← LINE 2 (now works!)
+
+        print(f"✅ Vector DB built with {len(self.vector_db.metadata)} items")
+        print(f"✅ Vector database built successfully!")
+        print(f"   - Metadata fields: {list(metadata_list[0].keys())}")
+        print(f"   - Similarity metric: Cosine (Inner Product)")
+
+        self.vector_db.save(index_path='./Embeddings/vector_db.index', metadata_path='./Embeddings/vector_db.pkl')
 
     def search_similar_anime(self, query_embedding: np.ndarray, top_k: int = 5):
         """Search for similar anime"""
