@@ -86,10 +86,11 @@ class TabularEncoder():
         node2vec = Node2Vec(
             self.G,
             dimensions=self.embedding_dim,
-            walk_length=30,
-            num_walks=100,
+            walk_length=3,  # 30
+            num_walks=5,   # 100 production
             workers=12,
-            weight_key='weight'
+            weight_key='weight',
+            temp_folder='./Embeddings/'
         )
         self.model = node2vec.fit(window=10, min_count=1, batch_words=4)
 
@@ -153,19 +154,21 @@ class TabularEncoder():
                     # Reconstruct the specific node name used in __build_graph
                     node_key = f"Anime_{row['title']}"
 
+                    # print(vectors)
+                    # print(vectors[node_key])
+                    # print(node_key)
+
                     if node_key in vectors:
                         # Use 'id' column if it exists, otherwise fallback to title
                         row_id = row['id'] if 'id' in row else row['title']
 
                         results.append({
-                            "id": row_id,
-                            "embedding": vectors[node_key]  # Add .tolist() here if you need a pure list
+                            row_id: vectors[node_key].tolist()
                         })
             else:
                 for node_key in vectors.index_to_key:
                     results.append({
-                        "id": node_key,
-                        "embedding": vectors[node_key]
+                        node_key: vectors[node_key].tolist()
                     })
             return results
 

@@ -24,7 +24,7 @@ class SynopsisEncoder(Encoder):
         embeddings = self.__run_model_batch(sentences, batch_size=batch_size)
 
         return [
-            {"id": row_id, "embedding": emb.tolist() if hasattr(emb, "tolist") else emb}
+            {row_id: emb.tolist() if hasattr(emb, "tolist") else emb}
             for row_id, emb in zip(data["id"], embeddings)
         ]
 

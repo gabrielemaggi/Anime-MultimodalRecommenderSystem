@@ -87,7 +87,7 @@ class VisualEncoder(Encoder):
             full_embeddings = np.vstack(features_list)
 
             return [
-                {"id": os.path.splitext(os.path.basename(path))[0], "embedding": emb.tolist()}
+                {os.path.splitext(os.path.basename(path))[0]: emb.tolist()}
                 for path, emb in zip(image_paths, full_embeddings)
             ]
 
