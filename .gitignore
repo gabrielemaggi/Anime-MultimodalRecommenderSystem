@@ -216,3 +216,6 @@ marimo/_lsp/
 __marimo__/
 
 libs/
+/Resources/UserAnimeList.csv
+/Resources/UserAnimeList.parquet
+/Resources/UserList.csv
