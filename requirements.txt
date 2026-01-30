@@ -4,3 +4,5 @@ torch
 torchvision
 transformers
 node2vec
+pyarrow>=7.0,<22
+
