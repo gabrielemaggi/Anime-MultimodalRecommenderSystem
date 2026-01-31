@@ -48,6 +48,8 @@ class Indexing:
         self.vector_db = None
         self.anime_metadata = None
 
+        self.anime_db = './Embeddings/AnimeVecDb'
+
 
     def calculate_synopsis_embedding(self):
         if not Path(self.synopsis_path).exists():
@@ -88,6 +90,7 @@ class Indexing:
 
 
     def calculate_embeddings(self):
+        # if not os.path.exists(self.anime_db + '.index'):
         self.calculate_synopsis_embedding()
         self.calculate_visual_embedding()
         self.calculate_tabular_embedding()
@@ -97,6 +100,8 @@ class Indexing:
         # Fused?
         self.fuse(method="mean")
         self.build_vector_database()
+            #else:
+            #self.load_vector_db(self.anime_db + '.index', self.anime_db + '.pkl')
 
 
     def joint_embeddings(self) -> dict:
@@ -150,7 +155,7 @@ class Indexing:
         directory = os.path.dirname(path)
         if directory and not os.path.exists(directory):
             os.makedirs(directory)
-        self.save_vector_db()
+
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(embeddings, f, indent=4)
 
@@ -217,60 +222,39 @@ class Indexing:
         print(f"Top {k} retrieval complete.")
         return top_k_ids
 
-    # Vector Database Functions
     def build_vector_database(self):
         """
         Builds the vector database by aligning fused embeddings with metadata.
-
-        Requirements:
-          - self.dataset: Path to CSV with anime metadata
-          - self.fused_embeddings: Dict {anime_id: embedding_vector}
-          - self.anime_ids: List of anime IDs in embedding order (from fusion step)
-          - self.AM: List of metadata column names to include (e.g., ['title', 'genre', 'rating'])
         """
         # 1. Validate prerequisites
-        if not hasattr(self, 'fused_embeddings') or self.fused_embeddings is None:
-            raise ValueError(
-                "No fused embeddings available. Run fusion step first (e.g., fusion.concatenate())."
-            )
-
-        if not hasattr(self, 'anime_ids') or not self.anime_ids:
-            raise ValueError(
-                "anime_ids not found. Ensure fusion step populated this attribute."
-            )
-
-        if not hasattr(self, 'AM') or not self.AM:
-            raise ValueError(
-                "Metadata columns (self.AM) not defined. Set e.g., self.AM = ['title', 'genre', 'episodes']"
-            )
+        if self.fused_embeddings is None:
+            raise ValueError("No fused embeddings available. Run fusion step first.")
+        if not self.anime_ids:
+            raise ValueError("anime_ids not found. Ensure fusion step populated this attribute.")
+        if not self.AM:
+            raise ValueError("Metadata columns (self.AM) not defined.")
 
         # 2. Load dataset
         try:
             df = pd.read_csv(self.dataset)
         except Exception as e:
-            raise IOError(f"Failed to load dataset from {self.dataset}: {e}")
+            raise IOError(f"Failed to load dataset: {e}")
 
-        # 3. Validate ID column (support both 'id' and 'anime_id')
+        # 3. Validate ID column
         id_col = 'id' if 'id' in df.columns else ('anime_id' if 'anime_id' in df.columns else None)
         if id_col is None:
-            raise ValueError(
-                f"Dataset must contain 'id' or 'anime_id' column. Found columns: {list(df.columns)}"
-            )
+            raise ValueError(f"Dataset must contain 'id' or 'anime_id'. Found: {list(df.columns)}")
 
-        # 4. Build metadata lookup (O(1) access)
-        # Convert ID column to string for consistent matching
+        # 4. Build metadata lookup
         df[id_col] = df[id_col].astype(str)
         available_cols = [col for col in self.AM if col in df.columns]
         if not available_cols:
-            raise ValueError(
-                f"None of the requested metadata columns {self.AM} found in dataset. "
-                f"Available columns: {list(df.columns)}"
-            )
+            raise ValueError(f"None of {self.AM} found in dataset. Available: {list(df.columns)}")
 
         metadata_lookup = df.set_index(id_col)[available_cols].to_dict('index')
-        print(f"Loaded metadata for {len(metadata_lookup)} items from {self.dataset}")
+        print(f"Loaded metadata for {len(metadata_lookup)} items")
 
-        # 5. Align embeddings with metadata in consistent order
+        # 5. Align embeddings + metadata IN CONSISTENT ORDER
         embedding_list = []
         metadata_list = []
         missing_metadata = []
@@ -278,14 +262,14 @@ class Indexing:
         for anime_id in self.anime_ids:
             str_id = str(anime_id)
 
-            # Get embedding (handle both dict and list formats)
+            # Get embedding (handle dict/list formats)
             if isinstance(self.fused_embeddings, dict):
                 emb = self.fused_embeddings.get(str_id)
-            else:  # list of dicts format
-                emb = next((item[str_id] for item in self.fused_embeddings if str_id in item), None)
+            else:  # list of dicts
+                emb = next((item.get(str_id) for item in self.fused_embeddings if str_id in item), None)
 
             if emb is None:
-                raise ValueError(f"Embedding not found for anime ID {str_id}")
+                raise ValueError(f"Embedding missing for ID {str_id}")
 
             # Get metadata
             meta = metadata_lookup.get(str_id)
@@ -293,10 +277,10 @@ class Indexing:
                 missing_metadata.append(str_id)
                 meta = {"id": str_id, "title": "Unknown", "_warning": "Metadata missing"}
             else:
-                meta = meta.copy()  # Avoid mutating original
+                meta = meta.copy()
                 meta["id"] = str_id
 
-            # Convert embedding to numpy array if needed
+            # Normalize embedding format
             if not isinstance(emb, np.ndarray):
                 emb = np.array(emb).flatten()
 
@@ -305,20 +289,31 @@ class Indexing:
 
         # 6. Warn about missing metadata
         if missing_metadata:
-            print(f"⚠️ Warning: {len(missing_metadata)} items missing metadata: {missing_metadata[:5]}...")
+            print(f"⚠️ Warning: {len(missing_metadata)} items missing metadata (e.g., {missing_metadata[:3]})")
 
-        # 7. Create embedding matrix
-        embeddings_matrix = np.array(list(self.fused_embeddings.values()), dtype='float32')  # ← LINE 1
+        # 7. CRITICAL FIX: Use aligned lists + validate lengths
+        if len(embedding_list) != len(metadata_list):
+            raise ValueError(f"Embedding count ({len(embedding_list)}) != metadata count ({len(metadata_list)})")
+
+        embeddings_matrix = np.array(embedding_list, dtype='float32')
         dimension = embeddings_matrix.shape[1]
+
+        # ✅ FIX: Assign metadata BEFORE adding vectors
+        self.anime_metadata = metadata_list  # <-- THIS WAS MISSING
+
+        # Initialize and populate DB
         self.vector_db = VectorDatabase(dimension, distance="cosine")
-        self.vector_db.add_vectors(embeddings_matrix, self.anime_metadata)  # ← LINE 2 (now works!)
+        self.vector_db.add_vectors(embeddings_matrix, self.anime_metadata)  # Now uses correct metadata
 
         print(f"✅ Vector DB built with {len(self.vector_db.metadata)} items")
-        print(f"✅ Vector database built successfully!")
-        print(f"   - Metadata fields: {list(metadata_list[0].keys())}")
-        print(f"   - Similarity metric: Cosine (Inner Product)")
+        print(f"   - Metadata fields: {list(self.anime_metadata[0].keys())}")
+        print(f"   - Embedding dimension: {dimension}")
 
-        self.vector_db.save(index_path='./Embeddings/vector_db.index', metadata_path='./Embeddings/vector_db.pkl')
+        # Save
+        self.vector_db.save(
+            index_path=self.anime_db + '.index',
+            metadata_path=self.anime_db + '.pkl'
+        )
 
     def search_similar_anime(self, query_embedding: np.ndarray, top_k: int = 5):
         """Search for similar anime"""
@@ -326,13 +321,6 @@ class Indexing:
             raise ValueError("Vector database not built. Call build_vector_database() first")
         results = self.vector_db.search(query_embedding, k=top_k)
         return results
-
-    def save_vector_db(self, index_path: str = "./Embeddings/faiss.index",
-                       metadata_path: str = "./Embeddings/metadata.pkl"):
-        """Save vector database"""
-        if self.vector_db is not None:
-            self.vector_db.save(index_path, metadata_path)
-            print(f"Vector database saved to {index_path}")
 
     def load_vector_db(self, index_path: str = "./Embeddings/faiss.index",
                        metadata_path: str = "./Embeddings/metadata.pkl"):

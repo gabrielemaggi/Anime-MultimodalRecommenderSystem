@@ -45,10 +45,10 @@ class VectorDatabase:
             faiss.normalize_L2(query_vector)
 
         distances, indices = self.index.search(query_vector, k)
-
         results = []
         for dist, idx in zip(distances[0], indices[0]):
             if 0 <= idx < len(self.metadata):
+
                 result = self.metadata[idx].copy()  # Return full metadata dict
                 result['distance'] = float(dist)
                 result['similarity'] = float(1 - dist/2) if isinstance(self.index, faiss.IndexFlatIP) else None
