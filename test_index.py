@@ -1,4 +1,4 @@
-from indexing import *
+from indexing_db import *
 import numpy as np
 
 def log_embeddings_info(embeddings, sample_key=None, top_n=5):
@@ -39,14 +39,9 @@ def log_embeddings_info(embeddings, sample_key=None, top_n=5):
 
 
 if __name__ == "__main__":
-    indexer = Indexing()
 
-    print("--- Starting Embedding Pipeline ---")
+    indexer = IndexingDB()
+    indexer.build_vector_database(fusion_method='weighted', fusion_weights=[0.4, 0.4, 0.2])
 
-    indexer.calculate_embeddings()
-    print(f"The type of fused_embeddings is: {type(indexer.fused_embeddings)}")
-    log_embeddings_info(indexer.fused_embeddings, sample_key='32785')
-
-    similars = indexer.search_similar_anime(indexer.fused_embeddings.get('32785'))
-
-    print(similars)
+    results = indexer.search(query_embedding, top_k=10)
+    info = indexer.get_database_info()

@@ -13,6 +13,7 @@ from SynopsisEncoder import *
 from TabularEncoder import *
 from VectorDatabase import *
 from Fusion import *
+
 # Import your existing classes
 # from tabular_embedder import TabularEmbedder
 # from visual_encoder import VisualEncoder
