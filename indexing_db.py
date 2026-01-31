@@ -3,7 +3,7 @@ import os
 import json
 from pathlib import Path
 import pandas as pd
-from typing import Optional, List
+from typing import Optional, List, Dict, Union
 import pickle
 
 from VisualEncoder import *
@@ -13,7 +13,7 @@ from VectorDatabase import *
 from Fusion import *
 
 
-class IndexingDB:
+class Indexing:
     def __init__(self):
         # Encoders
         self.synopsis_encoder = None
@@ -34,6 +34,30 @@ class IndexingDB:
 
         # Vector database
         self.vector_db = None
+
+        # Cached dataset
+        self._dataset_df = None
+
+        # Fusion settings (store for encoding queries)
+        self.fusion_method = 'mean'
+        self.fusion_weights = None
+
+
+    def _load_dataset(self) -> pd.DataFrame:
+        """Load and cache the dataset"""
+        if self._dataset_df is None:
+            self._dataset_df = pd.read_csv(self.dataset)
+        return self._dataset_df
+
+
+    def _ensure_encoders_loaded(self):
+        """Ensure all encoders are initialized"""
+        if self.synopsis_encoder is None:
+            self.synopsis_encoder = SynopsisEncoder()
+        if self.visual_encoder is None:
+            self.visual_encoder = VisualEncoder(model_size='small')
+        if self.tabular_encoder is None:
+            self.tabular_encoder = TabularEncoder()
 
 
     def _load_or_create_embeddings(self, path: str, encoder_fn, embed_type: str):
@@ -69,6 +93,10 @@ class IndexingDB:
             fusion_method: 'mean', 'concatenate', or 'weighted'
             fusion_weights: weights for weighted fusion (defaults to [0.4, 0.4, 0.2])
         """
+        # Store fusion settings
+        self.fusion_method = fusion_method
+        self.fusion_weights = fusion_weights
+
         # Check if database already exists
         if Path(self.anime_db_index).exists() and Path(self.anime_db_metadata).exists():
             print("Loading existing vector database...")
@@ -196,6 +224,33 @@ class IndexingDB:
         return fused
 
 
+    def _fuse_single_embeddings(self, synopsis_emb: np.ndarray,
+                               visual_emb: np.ndarray,
+                               tabular_emb: np.ndarray) -> np.ndarray:
+        """
+        Fuse a single set of embeddings using the same method as the database
+
+        Returns:
+            Fused embedding vector
+        """
+        method = self.fusion_method
+        weights = self.fusion_weights
+
+        if method == 'mean':
+            return np.mean([synopsis_emb, visual_emb, tabular_emb], axis=0)
+        elif method == 'concatenate':
+            return np.concatenate([synopsis_emb, visual_emb, tabular_emb])
+        elif method == 'weighted':
+            if weights is None:
+                weights = [0.4, 0.4, 0.2]
+            weighted_sum = (weights[0] * synopsis_emb +
+                          weights[1] * visual_emb +
+                          weights[2] * tabular_emb)
+            return weighted_sum
+        else:
+            raise ValueError(f"Unsupported fusion method: {method}")
+
+
     def _create_vector_database(self, fused_embeddings: np.ndarray, anime_ids: List[str]):
         """
         Create vector database with embeddings and metadata
@@ -277,6 +332,106 @@ class IndexingDB:
         print(f"✅ Vector database loaded: {len(self.vector_db.metadata)} items, dim={dimension}")
 
 
+    def encode_by_id(self, anime_id: Union[str, int]) -> np.ndarray:
+        """
+        Encode an anime by its ID from the dataset
+
+        Args:
+            anime_id: The ID of the anime to encode
+
+        Returns:
+            Fused embedding vector
+        """
+        # Load dataset
+        df = self._load_dataset()
+
+        # Identify ID column
+        id_col = 'id' if 'id' in df.columns else ('anime_id' if 'anime_id' in df.columns else None)
+        if id_col is None:
+            raise ValueError(f"Dataset must contain 'id' or 'anime_id'")
+
+        # Find the row
+        row = df[df[id_col] == anime_id]
+        if row.empty:
+            raise ValueError(f"Anime with ID {anime_id} not found in dataset")
+
+        row_data = row.iloc[0].to_dict()
+
+        # Encode using the row data
+        return self.encode_from_data(row_data, anime_id=anime_id)
+
+
+    def encode_from_data(self, data: Dict, anime_id: Optional[Union[str, int]] = None,
+                        image_path: Optional[str] = None) -> np.ndarray:
+        """
+        Encode anime data into a fused embedding vector
+
+        Args:
+            data: Dictionary containing anime information (must include fields for synopsis and tabular encoding)
+            anime_id: Optional anime ID (if not provided, will look for 'id' or 'anime_id' in data)
+            image_path: Optional path to anime poster image (if not provided, will try to find in image_dir)
+
+        Returns:
+            Fused embedding vector that can be used for search
+
+        Example:
+            >>> data = {
+            ...     'title': 'New Anime',
+            ...     'genre': 'Action, Fantasy',
+            ...     'sypnopsis': 'An epic adventure...',
+            ...     'episodes': 24,
+            ...     'rating': 8.5
+            ... }
+            >>> embedding = indexer.encode_from_data(data, image_path='path/to/poster.jpg')
+            >>> results = indexer.search(embedding, top_k=5)
+        """
+        self._ensure_encoders_loaded()
+
+        # Determine anime ID
+        if anime_id is None:
+            anime_id = data.get('id') or data.get('anime_id')
+            if anime_id is None:
+                anime_id = 'temp'  # Use temporary ID if none provided
+
+        # 1. Encode synopsis
+        synopsis = data.get('sypnopsis') or data.get('synopsis') or ''
+        if not synopsis:
+            raise ValueError("Data must contain 'sypnopsis' or 'synopsis' field")
+
+        synopsis_embedding = self.synopsis_encoder.run_model(synopsis)
+
+        # 2. Encode visual (poster image)
+        if image_path is None:
+            # Try to find image in image directory
+            possible_extensions = ['.jpg', '.png', '.webp']
+            for ext in possible_extensions:
+                potential_path = self.image_dir / f"{anime_id}{ext}"
+                if potential_path.exists():
+                    image_path = str(potential_path)
+                    break
+
+        if image_path is None or not Path(image_path).exists():
+            raise ValueError(f"Image not found. Provide image_path or place image at {self.image_dir}/{anime_id}.[jpg|png|webp]")
+
+        visual_embedding = self.visual_encoder.run_model(image_path)
+
+        # 3. Encode tabular data
+        # Convert data to DataFrame row for tabular encoder
+        # df_row = pd.DataFrame([data])
+        print(data.get('title'))
+        tabular_embedding = self.tabular_encoder.run_model(data.get('title'))
+
+
+        # 4. Fuse embeddings
+        fused_embedding = self._fuse_single_embeddings(
+            synopsis_embedding,
+            visual_embedding,
+            tabular_embedding
+        )
+
+        return fused_embedding
+
+
     def search(self, query_embedding: np.ndarray, top_k: int = 5) -> List[dict]:
         """
         Search for similar anime using query embedding
@@ -294,6 +449,38 @@ class IndexingDB:
         return self.vector_db.search(query_embedding, k=top_k)
 
 
+    def search_by_id(self, anime_id: Union[str, int], top_k: int = 5) -> List[dict]:
+        """
+        Find similar anime by encoding an anime ID from the dataset
+
+        Args:
+            anime_id: The ID of the anime to use as query
+            top_k: Number of similar anime to return
+
+        Returns:
+            List of similar anime with metadata and similarity scores
+        """
+        query_embedding = self.encode_by_id(anime_id)
+        return self.search(query_embedding, top_k=top_k)
+
+
+    def search_by_data(self, data: Dict, top_k: int = 5,
+                      image_path: Optional[str] = None) -> List[dict]:
+        """
+        Find similar anime by encoding provided anime data
+
+        Args:
+            data: Dictionary containing anime information
+            top_k: Number of similar anime to return
+            image_path: Optional path to anime poster image
+
+        Returns:
+            List of similar anime with metadata and similarity scores
+        """
+        query_embedding = self.encode_from_data(data, image_path=image_path)
+        return self.search(query_embedding, top_k=top_k)
+
+
     def get_database_info(self) -> dict:
         """Get information about the current vector database"""
         if self.vector_db is None:
@@ -303,5 +490,7 @@ class IndexingDB:
             "status": "loaded",
             "total_items": len(self.vector_db.metadata),
             "dimension": self.vector_db.dimension,
+            "fusion_method": self.fusion_method,
+            "fusion_weights": self.fusion_weights,
             "metadata_fields": list(self.vector_db.metadata[0].keys()) if self.vector_db.metadata else []
         }

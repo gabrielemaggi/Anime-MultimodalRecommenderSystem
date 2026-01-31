@@ -94,6 +94,22 @@ class VisualEncoder(Encoder):
             return np.vstack(features_list)
 
 
-    def run_model(self, images):
-        embedding = self.model.encode(images)
-        return embedding
+    def run_model(self, image_path):
+        """
+        Extracts embedding for a SINGLE image.
+
+        Args:
+            image_path (str): Path to image file
+
+        Returns:
+            np.ndarray: Embedding vector of shape (embedding_dim,) if successful, else None
+        """
+        tensor = self.__load(image_path)
+        if tensor is None:
+            return None
+
+        with torch.no_grad():
+            embedding = self.model(tensor.to(self.device)).cpu().numpy()
+
+        # Remove batch dimension and return 1D array
+        return embedding.squeeze(0)  # Shape: (embedding_dim,)

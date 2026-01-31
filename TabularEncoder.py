@@ -14,7 +14,8 @@ class TabularEncoder():
         # Internal state
         self.df = None
         self.G = None
-        self.model = None  # Can hold Word2Vec (Gensim) or KeyedVectors
+        self.model_path = "./Embeddings/anime_node2vec_weighted.model"
+        self.model = None
         # self.embeddings_loaded = False
 
     def encode(self, cvs_path):
@@ -198,7 +199,26 @@ class TabularEncoder():
 
         return results
 
+    def run_model(self, anime_title):
 
+        self.load_embeddings()
+
+        vectors = self.model.wv if hasattr(self.model, 'wv') else self.model
+
+        node_key = f"Anime_{anime_title}"
+        print(vectors)
+
+        if node_key in vectors:
+            return vectors[node_key]
+        else:
+            print(f"Anime '{anime_title}' not found in model vocabulary.")
+            # Optional: Suggest similar titles if available
+            if hasattr(vectors, 'key_to_index'):
+                similar_titles = [k.replace('Anime_', '') for k in vectors.key_to_index.keys()
+                                if k.startswith('Anime_') and anime_title.lower() in k.lower()]
+                if similar_titles:
+                    print(f"Did you mean one of these? {similar_titles[:3]}")
+            return None
 
 # --- MAIN TEST SCRIPT ---
 if __name__ == "__main__":
@@ -207,7 +227,7 @@ if __name__ == "__main__":
     csv_file = 'AnimeList.csv'
 
     # Define the specific filenames you requested
-    recommender = TabularEmbedder(
+    recommender = TabularEncoder(
         csv_path=csv_file,
         model_path='anime_node2vec_weighted.model',  # Gensim format
         vectors_path='anime_embeddings.vec',  # Text format
