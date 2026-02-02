@@ -5,19 +5,21 @@ import os
 import torch  # Required for .pt files
 from node2vec import Node2Vec
 from gensim.models import KeyedVectors, Word2Vec
-from encoder import*
+from Encoder import *
 
-class TabularEmbedder(Encoder):
+class TabularEncoder():
     def __init__(self, embedding_dim=384):
 
+        self.embedding_dim = embedding_dim
         # Internal state
         self.df = None
         self.G = None
-        self.model = None  # Can hold Word2Vec (Gensim) or KeyedVectors
+        self.model_path = "./Embeddings/anime_node2vec_weighted.model"
+        self.model = None
         # self.embeddings_loaded = False
 
     def encode(self, cvs_path):
-        self.__load()
+        self.__load(cvs_path)
         self.__build_graph()
         self.__train_model()
         return self.return_embeddings()
@@ -85,10 +87,11 @@ class TabularEmbedder(Encoder):
         node2vec = Node2Vec(
             self.G,
             dimensions=self.embedding_dim,
-            walk_length=30,
-            num_walks=100,
+            walk_length=3,  # 30
+            num_walks=5,   # 100 production
             workers=12,
-            weight_key='weight'
+            weight_key='weight',
+            temp_folder='./Embeddings/'
         )
         self.model = node2vec.fit(window=10, min_count=1, batch_words=4)
 
@@ -152,19 +155,21 @@ class TabularEmbedder(Encoder):
                     # Reconstruct the specific node name used in __build_graph
                     node_key = f"Anime_{row['title']}"
 
+                    # print(vectors)
+                    # print(vectors[node_key])
+                    # print(node_key)
+
                     if node_key in vectors:
                         # Use 'id' column if it exists, otherwise fallback to title
                         row_id = row['id'] if 'id' in row else row['title']
 
                         results.append({
-                            "id": row_id,
-                            "embedding": vectors[node_key]  # Add .tolist() here if you need a pure list
+                            row_id: vectors[node_key].tolist()
                         })
             else:
                 for node_key in vectors.index_to_key:
                     results.append({
-                        "id": node_key,
-                        "embedding": vectors[node_key]
+                        node_key: vectors[node_key].tolist()
                     })
             return results
 
@@ -194,7 +199,26 @@ class TabularEmbedder(Encoder):
 
         return results
 
+    def run_model(self, anime_title):
 
+        self.load_embeddings()
+
+        vectors = self.model.wv if hasattr(self.model, 'wv') else self.model
+
+        node_key = f"Anime_{anime_title}"
+        print(vectors)
+
+        if node_key in vectors:
+            return vectors[node_key]
+        else:
+            print(f"Anime '{anime_title}' not found in model vocabulary.")
+            # Optional: Suggest similar titles if available
+            if hasattr(vectors, 'key_to_index'):
+                similar_titles = [k.replace('Anime_', '') for k in vectors.key_to_index.keys()
+                                if k.startswith('Anime_') and anime_title.lower() in k.lower()]
+                if similar_titles:
+                    print(f"Did you mean one of these? {similar_titles[:3]}")
+            return None
 
 # --- MAIN TEST SCRIPT ---
 if __name__ == "__main__":
@@ -203,7 +227,7 @@ if __name__ == "__main__":
     csv_file = 'AnimeList.csv'
 
     # Define the specific filenames you requested
-    recommender = TabularEmbedder(
+    recommender = TabularEncoder(
         csv_path=csv_file,
         model_path='anime_node2vec_weighted.model',  # Gensim format
         vectors_path='anime_embeddings.vec',  # Text format

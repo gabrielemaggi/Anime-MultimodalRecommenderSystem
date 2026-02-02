@@ -6,6 +6,7 @@ __pycache__/
 dataset/
 Var/
 MyAnimeList-Database/
+Embeddings/
 
 # C extensions
 *.so
