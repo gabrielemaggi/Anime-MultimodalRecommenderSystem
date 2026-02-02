@@ -66,3 +66,21 @@ class VectorDatabase:
         self.index = faiss.read_index(index_path)
         with open(metadata_path, 'rb') as f:
             self.metadata = pickle.load(f)
+
+    def get_embedding_by_id(self, item_id):
+        """
+        Get embedding vector by ID from metadata
+        Args:
+            item_id: The ID to search for in metadata
+        Returns:
+            numpy array of the embedding vector, or None if not found
+        """
+        # Find the index in metadata list where id matches
+
+        for idx, meta in enumerate(self.metadata):
+            if int(meta.get('id')) == item_id:
+                # print("Found!")
+                # Reconstruct the vector from the FAISS index
+                vector = self.index.reconstruct(int(idx))
+                return vector
+        return None

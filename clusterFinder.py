@@ -1,6 +1,8 @@
 from math import sqrt
 import numpy as np
 from sklearn.cluster import KMeans
+from indexing_db import *
+
 class clusterFinder:
 
     def __init__(self , vecArray):
@@ -8,9 +10,17 @@ class clusterFinder:
         :param vecArray: an array of vector and scores e.g : [ [ v1, 10] , [v2 , score2 ] ....]
         """
         self.num_of_anime = len(vecArray)
-        vectors_temp = np.vstack(vecArray[:, 0])
-        self.vectors = [get_Anime_Embding_by_id(v) for  v in vectors_temp]
-        self.scores = vecArray[:, 1].astype(int)
+
+        self.vec_db = Indexing()
+        self.vec_db.load_vector_database()
+
+        self.vectors = []
+        self.scores = []
+        for [anime_id, rating] in vecArray:
+            embedding = self.vec_db.get_db_embedding_by_id(anime_id)
+            self.vectors.append(embedding)
+            self.scores.append(rating)
+            # print(embedding)
         self.K = int(sqrt(self.num_of_anime / 2 ))
 
     def get_centers(self):
@@ -25,5 +35,3 @@ class clusterFinder:
 
     def getK(self):
         return self.K
-
-

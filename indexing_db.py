@@ -13,6 +13,7 @@ from VectorDatabase import *
 from Fusion import *
 
 
+
 class Indexing:
     def __init__(self):
         # Encoders
@@ -345,19 +346,15 @@ class Indexing:
         """
         # Load dataset
         df = self._load_dataset()
-
         # Identify ID column
         id_col = 'id' if 'id' in df.columns else ('anime_id' if 'anime_id' in df.columns else None)
         if id_col is None:
             raise ValueError(f"Dataset must contain 'id' or 'anime_id'")
-
         # Find the row
         row = df[df[id_col] == anime_id]
         if row.empty:
             raise ValueError(f"Anime with ID {anime_id} not found in dataset")
-
         row_data = row.iloc[0].to_dict()
-
         # Encode using the row data
         return self.encode_from_data(row_data, anime_id=anime_id)
 
@@ -481,6 +478,8 @@ class Indexing:
         query_embedding = self.encode_from_data(data, image_path=image_path)
         return self.search(query_embedding, top_k=top_k)
 
+    def get_db_embedding_by_id(self, id):
+        return self.vector_db.get_embedding_by_id(id)
 
     def get_database_info(self) -> dict:
         """Get information about the current vector database"""

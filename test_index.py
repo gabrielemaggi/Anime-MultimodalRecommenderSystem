@@ -44,6 +44,7 @@ if __name__ == "__main__":
     indexer.build_vector_database(fusion_method='weighted', fusion_weights=[0.4, 0.4, 0.2])
 
     results = indexer.search_by_id(34572, top_k=5)
+
     info = indexer.get_database_info()
     print("-"*50)
     print("results: ", results)

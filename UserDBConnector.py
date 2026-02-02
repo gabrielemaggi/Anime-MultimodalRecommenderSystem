@@ -31,7 +31,6 @@ class UserDBConnector:
         # Check if the user_id exists in the 'user_id' column
         # We use .values to check for existence efficiently
         exists = user_id in self.userMapDf['user_id'].values
-
         return exists
 
     def get_unused_user_id(self):
@@ -71,4 +70,3 @@ class UserDBConnector:
         watched_data = user_data[['anime_id', 'my_score']].values.tolist()
 
         return watched_data
-

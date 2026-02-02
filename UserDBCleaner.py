@@ -2,21 +2,26 @@
 import pandas as pd
 import os
 class UserDBCleaner:
-    _instance = None
-    user_list_path = "Resources/UserList.csv"
-    user_AnimeList_path = "Resources/UserAnimeList.csv"
-    user_list_parquet = "Resources/UserList.parquet"
-    user_anime_parquet = "Resources/UserAnimeList.parquet"
-    def __new__(cls):
-        if cls._instance is None:
-            # Create the single instance of the class
-            cls._instance = super(UserDBCleaner, cls).__new__(cls)
+    _initialized = False
 
-            # Load DataFrames immediately upon construction
-            print("Initializing Singleton: Loading databases into memory...")
-            cls._instance._load_initial_data()
-            cls._instance.process_and_finalize_user_data()
-        return cls._instance
+    def __init__(self):
+        # Prevent re-initialization if UserDBCleaner() is called again
+        if self._initialized:
+            print("Already init")
+            return
+
+        self.user_list_path = "Var/UserList.csv"
+        self.user_AnimeList_path = "Var/UserAnimeList.csv"
+
+        self.user_list_parquet = "Resources/UserList.parquet"
+        self.user_anime_parquet = "Resources/UserAnimeList.parquet"
+
+        print("Initializing Singleton: Loading databases into memory...")
+        self._load_initial_data()
+        self.process_and_finalize_user_data()
+
+        self._initialized = True
+
 
     def _load_initial_data(self):
         """Loads dataframes from Parquet if available, otherwise falls back to CSV."""
@@ -89,5 +94,7 @@ class UserDBCleaner:
 
     def get_userAnime_df(self):
         return self.anime_list_df
+
+
     def get_user_df(self):
         return self.user_mapping_df
