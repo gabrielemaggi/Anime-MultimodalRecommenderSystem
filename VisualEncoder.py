@@ -8,6 +8,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from Encoder import *
 
 class VisualEncoder(Encoder):
+
     def __init__(self, model_size='small', device=None):
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         self.model_name = self._get_model_name(model_size)
@@ -22,6 +23,9 @@ class VisualEncoder(Encoder):
             T.ToTensor(),
             T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
+
+    def getModel(self):
+        return self.model
 
     def _get_model_name(self, size):
         model_map = {
@@ -90,9 +94,6 @@ class VisualEncoder(Encoder):
                 {os.path.splitext(os.path.basename(path))[0]: emb.tolist()}
                 for path, emb in zip(image_paths, full_embeddings)
             ]
-
-            return np.vstack(features_list)
-
 
     def run_model(self, image_path):
         """

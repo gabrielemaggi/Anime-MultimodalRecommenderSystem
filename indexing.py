@@ -88,8 +88,6 @@ class Indexing:
             print("Loading existing tabular embeddings...")
             self.load(self.tabular_path, type='tab')
 
-
-
     def calculate_embeddings(self):
         # if not os.path.exists(self.anime_db + '.index'):
         self.calculate_synopsis_embedding()
@@ -103,7 +101,6 @@ class Indexing:
         self.build_vector_database()
             #else:
             #self.load_vector_db(self.anime_db + '.index', self.anime_db + '.pkl')
-
 
     def joint_embeddings(self) -> dict:
         # Flatten each list-of-dicts into a single ID->embedding mapping
@@ -132,7 +129,6 @@ class Indexing:
 
         return joint_dict
 
-
     def fuse(self, method='weighted', weights: Optional[List[float]] = None):
         fusion_engine = Fusion(
             (self.anime_embeddings)
@@ -150,7 +146,6 @@ class Indexing:
         else:
             raise ValueError(f"Metodo di fusione {method} non supportato.")
         return self.fused_embeddings
-
 
     def save(self, embeddings, path):
         directory = os.path.dirname(path)
@@ -290,7 +285,7 @@ class Indexing:
 
         # 6. Warn about missing metadata
         if missing_metadata:
-            print(f"⚠️ Warning: {len(missing_metadata)} items missing metadata (e.g., {missing_metadata[:3]})")
+            print(f"Warning: {len(missing_metadata)} items missing metadata (e.g., {missing_metadata[:3]})")
 
         # 7. CRITICAL FIX: Use aligned lists + validate lengths
         if len(embedding_list) != len(metadata_list):
