@@ -21,13 +21,14 @@ class SynopsisEncoder(Encoder):
         sentences = (
             data["sypnopsis"].fillna("No description available").astype(str).tolist()
         )
-        embeddings = __run_model_batch(sentences, batch_size=batch_size)
+        embeddings = self.__run_model_batch(sentences, batch_size=batch_size)
 
         return [
-            {"id": row_id, "embedding": emb.tolist() if hasattr(emb, "tolist") else emb} for row_id, emb in zip(data["id"], embeddings)
-            ];,
+            {row_id: emb.tolist() if hasattr(emb, "tolist") else emb}
+            for row_id, emb in zip(data["id"], embeddings)
+        ]
 
-    def __load(self, filepath):
+    def __load(self, csv_path):
         if not os.path.exists(csv_path):
             print(f"Error: {csv_path} not found. Cannot generate embeddings.")
             return None
