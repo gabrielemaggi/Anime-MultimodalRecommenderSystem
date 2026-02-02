@@ -76,6 +76,6 @@ if __name__ == "__main__":
     index = Indexing()
     index.load_vector_database()
 
-    u = User(-1)
+    u = User(1289601)
     u.findCentersOfClusters()
     print(u.get_nearest_anime_from_clusters(index, 1))
