@@ -28,6 +28,7 @@ class SynopsisEncoder(Encoder):
             for row_id, emb in zip(data["id"], embeddings)
         ]
 
+
     def __load(self, csv_path):
         if not os.path.exists(csv_path):
             print(f"Error: {csv_path} not found. Cannot generate embeddings.")

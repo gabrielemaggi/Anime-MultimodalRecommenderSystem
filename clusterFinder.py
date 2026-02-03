@@ -21,7 +21,13 @@ class clusterFinder:
             self.vectors.append(embedding)
             self.scores.append(rating)
             # print(embedding)
-        self.K = int(sqrt(self.num_of_anime / 2 ))
+
+        if self.num_of_anime == 1:
+            self.K = 1
+        elif self.num_of_anime <= 8:
+            self.K = 2
+        else:
+            self.K = int(sqrt(self.num_of_anime / 2 ))
 
     def get_centers(self):
         kmeans = KMeans(n_clusters=self.K, random_state=42, n_init=10)

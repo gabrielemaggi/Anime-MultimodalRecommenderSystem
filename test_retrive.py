@@ -1,4 +1,5 @@
 from indexing_db import *
+from Fusion import *
 import numpy as np
 
 def log_embeddings_info(embeddings, sample_key=None, top_n=5):
@@ -37,12 +38,34 @@ def log_embeddings_info(embeddings, sample_key=None, top_n=5):
     print(f"Vector Preview (first {top_n}): {snippet}")
     print("----------------------------------\n")
 
-
 if __name__ == "__main__":
 
     indexer = Indexing()
-    indexer.build_vector_database()
-    results = indexer.search_by_id(26055, top_k=5)
+    indexer.load_vector_database()
+
+
+    image_path = "./dataset/images/26055.jpg"
+    syn = "Joutarou Kuujou and his allies have finally made it to Egypt, where the immortal Dio awaits. Upon their arrival, the group gains a new comrade: Iggy, a mutt who wields the Stand \"The Fool.\" It's not all good news however, as standing in their path is a new group of Stand users who serve Dio, each with a Stand representative of an ancient Egyptian god. As their final battle approaches, it is a race against time to break Joutarou's mother free from her curse and end Dio's reign of terror over the Joestar family once and for all."
+    id = 11123
+    title = "JoJo no Kimyou na Bouken: Stardust Crusaders 2nd Season"
+
+    data = {
+       'title': title,
+       'sypnopsis': syn
+    }
+    nana = 877
+    jojo = 666
+    blackclover = 34572
+
+    query = indexer.encode_by_id(blackclover)
+    # v = indexer.encode_image(image)
+    # s = indexer.encode_sypnopsis(data)
+    # t = indexer.encode_tabular("Kishibe Rohan wa Ugokanai")
+
+    # query = fuser.
+
+
+    results = indexer.search(query)
 
     info = indexer.get_database_info()
     print("-"*50)

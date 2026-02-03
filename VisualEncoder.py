@@ -8,11 +8,13 @@ from sklearn.metrics.pairwise import cosine_similarity
 from Encoder import *
 
 class VisualEncoder(Encoder):
+
     def __init__(self, model_size='small', device=None):
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         self.model_name = self._get_model_name(model_size)
 
         print(f"Loading {self.model_name} on {self.device}...")
+
         self.model = torch.hub.load('facebookresearch/dinov2', self.model_name)
         self.model.to(self.device).eval()
 
@@ -22,6 +24,9 @@ class VisualEncoder(Encoder):
             T.ToTensor(),
             T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
+
+    def getModel(self):
+        return self.model
 
     def _get_model_name(self, size):
         model_map = {
@@ -91,25 +96,28 @@ class VisualEncoder(Encoder):
                 for path, emb in zip(image_paths, full_embeddings)
             ]
 
-            return np.vstack(features_list)
-
-
-    def run_model(self, image_path):
+    def run_model(self, image_input):
         """
         Extracts embedding for a SINGLE image.
-
-        Args:
-            image_path (str): Path to image file
-
-        Returns:
-            np.ndarray: Embedding vector of shape (embedding_dim,) if successful, else None
+        Handles both file paths and PIL Images.
         """
-        tensor = self.__load(image_path)
+        # 1. Define the necessary transformations
+        # Adjust size (224, 224) if your model requires a different input size
+        # 2. Logic to handle Path vs. Image Object
+        if isinstance(image_input, str):
+            # If it's a path, use your existing load method
+            tensor = self.__load(image_input)
+        else:
+            # If it's already an image (PIL), apply transforms directly
+            tensor = self.trasform(image_input)
+
         if tensor is None:
             return None
 
+        # 3. Model Inference
         with torch.no_grad():
+            # Add batch dimension: [C, H, W] -> [1, C, H, W]
+            if tensor.ndimension() == 3:
+                tensor = tensor.unsqueeze(0)
             embedding = self.model(tensor.to(self.device)).cpu().numpy()
-
-        # Remove batch dimension and return 1D array
-        return embedding.squeeze(0)  # Shape: (embedding_dim,)
+        return embedding.squeeze(0)

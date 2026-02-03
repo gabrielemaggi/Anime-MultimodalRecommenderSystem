@@ -2,6 +2,7 @@ import faiss
 import numpy as np
 import pickle
 
+
 class VectorDatabase:
     def __init__(self, dimension: int, distance="cosine"):
         self.dimension = dimension
@@ -20,6 +21,9 @@ class VectorDatabase:
             metadata: list of dicts with length n (optional; if None, uses indices as IDs)
         """
         embeddings = embeddings.astype('float32')
+
+        if isinstance(self.index, faiss.IndexFlatIP):
+                faiss.normalize_L2(embeddings)
 
         if embeddings.shape[1] != self.dimension:
             raise ValueError(f"Expected dimension {self.dimension}, got {embeddings.shape[1]}")
@@ -48,10 +52,17 @@ class VectorDatabase:
         results = []
         for dist, idx in zip(distances[0], indices[0]):
             if 0 <= idx < len(self.metadata):
-
-                result = self.metadata[idx].copy()  # Return full metadata dict
-                result['distance'] = float(dist)
-                result['similarity'] = float(1 - dist/2) if isinstance(self.index, faiss.IndexFlatIP) else None
+                result = self.metadata[idx].copy()
+                # Se l'indice è Inner Product e hai normalizzato L2:
+                # dist è già la Cosine Similarity (da -1 a 1)
+                if isinstance(self.index, faiss.IndexFlatIP):
+                    result['similarity'] = float(dist)
+                    # La distanza coseno è definita come 1 - similarity
+                    result['distance'] = 1.0 - float(dist)
+                else:
+                    # Se usassi IndexFlatL2, dist sarebbe la distanza euclidea al quadrato
+                    result['distance'] = float(dist)
+                    result['similarity'] = None # O formula di conversione L2->Sim
                 results.append(result)
         return results
 

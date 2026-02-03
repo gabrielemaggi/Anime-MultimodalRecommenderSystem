@@ -5,15 +5,25 @@ from indexing_db import *
 
 class User:
 
+    # API_ID = d79a8a3b8f42750e317b0b7abc47adf2
+
     # get a user from the db
-    def __init__(self, id ):
+    def __init__(self, id):
         self.userDBConnector = UserDBConnector()
         self.embeddings = None
+
         if(self.userDBConnector.check_if_user_exists(id)):
             self.id = id;
             self.watched = self.userDBConnector.get_anime_watched_by_user(id)
+
         else:
-            print("no id found")
+
+            if isinstance(id, int):
+                # call api solo con id
+                pass
+            else:
+                # call api con user
+                pass
 
 
     # create a new User in the system
