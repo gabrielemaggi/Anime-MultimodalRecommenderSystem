@@ -12,7 +12,7 @@ from TabularEncoder import *
 from VectorDatabase import *
 from Fusion import *
 
-
+import torch.nn.functional as F
 
 class Indexing:
     def __init__(self):
@@ -41,7 +41,7 @@ class Indexing:
         self._dataset_df = None
 
         # Fusion settings (store for encoding queries)
-        self.fusion_method = 'weighted'
+        self.fusion_method = 'concatenate'
         self.fusion_weights = [0.7, 0.1, 0.2]
 
 
@@ -85,9 +85,33 @@ class Indexing:
             json.dump(embeddings, f, indent=4)
         print(f"Embeddings successfully saved to {path}")
 
+    def _normalize_embeddings(self, embedding_list: List[Dict[str, List[float]]]) -> List[Dict[str, List[float]]]:
+            """
+            Normalizes a list of dictionary embeddings (L2 Norm).
+            Structure: [{'id': [vector]}, ...] -> Tensor -> Normalize -> [{'id': [normalized_vector]}, ...]
+            """
+            import torch
 
-    def build_vector_database(self, fusion_method: str = 'mean',
-                             fusion_weights: Optional[List[float]] = None):
+            # 1. Flatten the list of dicts into parallel lists of IDs and Vectors
+            # This assumes each dict in the list has exactly one key-value pair, based on your _align logic
+            ids = []
+            vectors = []
+            for item in embedding_list:
+                for k, v in item.items():
+                    ids.append(k)
+                    vectors.append(v)
+            # 2. Convert to PyTorch Tensor (Batch processing is much faster)
+            # shape: (num_items, embedding_dim)
+            tensor_vectors = torch.tensor(vectors, dtype=torch.float)
+            # 3. Apply L2 Normalization
+            # dim=1 applies it across the embedding dimension (the rows)
+            normalized_tensor = F.normalize(tensor_vectors, p=2, dim=1)
+            # 4. Convert back to Python List for compatibility with the rest of your pipeline
+            normalized_vectors = normalized_tensor.tolist()
+            # 5. Reconstruct the original list-of-dicts structure
+            return [{id_val: vec} for id_val, vec in zip(ids, normalized_vectors)]
+
+    def build_vector_database(self): #(self, fusion_method: str = 'mean',fusion_weights: Optional[List[float]] = None):
         """
         Main method: builds the complete vector database from scratch or loads existing one
 
@@ -96,8 +120,8 @@ class Indexing:
             fusion_weights: weights for weighted fusion (defaults to [0.4, 0.4, 0.2])
         """
         # Store fusion settings
-        self.fusion_method = fusion_method
-        self.fusion_weights = fusion_weights
+        # self.fusion_method = fusion_method
+        # self.fusion_weights = fusion_weights
 
         # Check if database already exists
         if Path(self.anime_db_index).exists() and Path(self.anime_db_metadata).exists():
@@ -126,6 +150,11 @@ class Indexing:
             "tabular"
         )
 
+        print("Normalizing embeddings...")
+        synopsis_embeddings = self._normalize_embeddings(synopsis_embeddings)
+        visual_embeddings = self._normalize_embeddings(visual_embeddings)
+        tabular_embeddings = self._normalize_embeddings(tabular_embeddings)
+
         # 2. Align embeddings by common IDs
         print("Aligning embeddings...")
         aligned_data = self._align_embeddings(
@@ -135,11 +164,11 @@ class Indexing:
         )
 
         # 3. Fuse embeddings
-        print(f"Fusing embeddings using {fusion_method} method...")
+        print(f"Fusing embeddings using {self.fusion_method} method...")
         fused_embeddings = self._fuse_embeddings(
             aligned_data,
-            fusion_method,
-            fusion_weights
+            self.fusion_method,
+            self.fusion_weights
         )
 
         # 4. Load metadata and build vector database

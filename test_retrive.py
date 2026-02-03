@@ -53,8 +53,11 @@ if __name__ == "__main__":
        'title': title,
        'sypnopsis': syn
     }
+    nana = 877
+    jojo = 666
+    blackclover = 34572
 
-    query = indexer.encode_by_id(33950)
+    query = indexer.encode_by_id(blackclover)
     # v = indexer.encode_image(image)
     # s = indexer.encode_sypnopsis(data)
     # t = indexer.encode_tabular("Kishibe Rohan wa Ugokanai")

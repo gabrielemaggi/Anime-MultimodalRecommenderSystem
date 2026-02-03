@@ -43,7 +43,7 @@ class TabularEncoder():
         self.G = nx.Graph()
         print("Building graph with weighted edges...")
 
-        BASE_GENRE_WEIGHT = 1.0
+        BASE_GENRE_WEIGHT = 0.7
         BASE_STUDIO_WEIGHT = 2.0
 
         for index, row in self.df.iterrows():

@@ -2,8 +2,9 @@ import faiss
 import numpy as np
 import pickle
 
+
 class VectorDatabase:
-    def __init__(self, dimension: int, distance="L2"):
+    def __init__(self, dimension: int, distance="cosine"):
         self.dimension = dimension
         if distance == "cosine":
             self.index = faiss.IndexFlatIP(dimension)
