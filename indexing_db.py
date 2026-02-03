@@ -463,7 +463,6 @@ class Indexing:
         print(data.get('title'))
         tabular_embedding = self.tabular_encoder.run_model(data.get('title'))
 
-
         # 4. Fuse embeddings
         fused_embedding = self._fuse_single_embeddings(
             anime_id,
