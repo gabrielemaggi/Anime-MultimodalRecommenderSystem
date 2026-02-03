@@ -32,10 +32,15 @@ class User:
 
             watched = []
             for anime in watch_list:
+
+                #TODO recupera anche: sinossi, immagine, genere e studio
+                # creo dizionario e poi chiamo vector_db add vector, da creare anche i metadata.
+                # solo dei dati non nel dizionario
                 title_mal = anime.entry.title
                 score = anime.list_status.score
 
                 match = df_anime[df_anime['title'].str.lower() == title_mal.lower()]
+                do_not_match = df_anime[df_anime['title'].str.lower() != title_mal.lower()]
 
                 if not match.empty:
                     anime_id = match.iloc[0]['anime_id']
