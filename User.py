@@ -1,29 +1,58 @@
 import pandas as pd
+from sympy.codegen.ast import Raise
+
 from UserDBConnector import UserDBConnector
 from clusterFinder import clusterFinder
 from indexing_db import *
+from mal import client
 
 class User:
-
-    # API_ID = d79a8a3b8f42750e317b0b7abc47adf2
 
     # get a user from the db
     def __init__(self, id):
         self.userDBConnector = UserDBConnector()
         self.embeddings = None
 
-        if(self.userDBConnector.check_if_user_exists(id)):
-            self.id = id;
+        if self.userDBConnector.check_if_user_exists(id):
+            self.id = id
             self.watched = self.userDBConnector.get_anime_watched_by_user(id)
 
         else:
 
+            API_ID = "d79a8a3b8f42750e317b0b7abc47adf2"
+            api = client.Client(API_ID)
+
             if isinstance(id, int):
-                # call api solo con id
-                pass
-            else:
-                # call api con user
-                pass
+                raise ValueError("User ID must be a String")
+
+            watch_list = api.get_anime_list(username=id, limit=100, include_nsfw=True)
+            self.id=id
+
+            df_anime = pd.read_csv("dataset/AnimeList_updated.csv")
+
+            watched = []
+            for anime in watch_list:
+
+                #TODO recupera anche: sinossi, immagine, genere e studio
+                # creo dizionario e poi chiamo vector_db add vector, da creare anche i metadata.
+                # solo dei dati non nel dizionario
+                title_mal = anime.entry.title
+                score = anime.list_status.score
+
+                match = df_anime[df_anime['title'].str.lower() == title_mal.lower()]
+                do_not_match = df_anime[df_anime['title'].str.lower() != title_mal.lower()]
+
+                if not match.empty:
+                    anime_id = match.iloc[0]['anime_id']
+                    watched.append([anime_id, score])
+                else:
+                    print(f"Warning: {title_mal} do not find in the anime database.")
+
+            self.watched = watched
+            self.watch_anime_info = watched
+
+            #TODO add user to DB
+
 
 
     # create a new User in the system
@@ -46,14 +75,15 @@ class User:
         self.embeddings = kmean.get_centers()
         return self.embeddings
 
-
     def get_nearest_anime_from_clusters(self, vector_db, top_k: int = 10):
         """
         Find nearest anime to each cluster center and return their IDs
         """
         if not hasattr(self, 'embeddings'):
             self.findCentersOfClusters()
+
         all_anime_entries = []
+
         # 1. Gather all recommendations
         for center_embedding in self.embeddings:
             nearest_entries = vector_db.search(
@@ -61,10 +91,12 @@ class User:
                 top_k=top_k
             )
             all_anime_entries.extend(nearest_entries)
+
         # 2. PRE-PROCESS WATCHED IDS
         # Convert self.watched [[id, score], ...] into a set of IDs for fast O(1) lookup.
         # We cast to str() to ensure '123' (string) matches 123 (int) to avoid type mismatches.
         watched_ids = {str(item[0]) for item in self.watched}
+
         # 3. Filter duplicates and watched items
         seen_ids = set()
         unique_anime_entries = []
@@ -72,10 +104,14 @@ class User:
             # Extract the ID from the dictionary (vector DB result)
             # Ensure we use the correct key, e.g., 'id' or 'anime_id'
             current_id = str(anime_data.get('id'))
+
             # Check if we have seen this ID in this loop OR if the user watched it
             if current_id not in seen_ids and current_id not in watched_ids:
                 seen_ids.add(current_id)
                 unique_anime_entries.append(anime_data)
+
+        # Sort by similarity and slice to respect the actual top_k requested
+        unique_anime_entries.sort(key=lambda x: x.get('similarity', 0), reverse=True)
         return unique_anime_entries
 
     def debug_plot_watchlist(self):
