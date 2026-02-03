@@ -94,10 +94,11 @@ with results_container:
                     with cols[j]:
                         with st.container(border=True):
                             img_path = find_anime_image(anime_id)
+                            print(type(img_path))
                             if img_path:
-                                st.image(img_path, width='stretch')
+                                st.image(img_path, use_container_width=True)
                             else:
-                                st.image("https://via.placeholder.com/200x300?text=No+Image", width='stretch')
+                                st.image("https://via.placeholder.com/200x300?text=No+Image", use_container_width=True)
 
                             title = anime.get("title", "Unknown Title")
                             st.markdown(f"**{title}**")

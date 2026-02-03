@@ -28,7 +28,7 @@ class User:
             watch_list = api.get_anime_list(username=id, limit=100, include_nsfw=True)
             self.id=id
 
-            df_anime = pd.read_csv("dataset/AnimeList_updated.csv")
+            df_anime = pd.read_csv("./AnimeList.csv")
 
             watched = []
             for anime in watch_list:
@@ -43,7 +43,7 @@ class User:
                 do_not_match = df_anime[df_anime['title'].str.lower() != title_mal.lower()]
 
                 if not match.empty:
-                    anime_id = match.iloc[0]['anime_id']
+                    anime_id = match.iloc[0]['id']
                     watched.append([anime_id, score])
                 else:
                     print(f"Warning: {title_mal} do not find in the anime database.")
@@ -177,7 +177,7 @@ if __name__ == "__main__":
     index = Indexing()
     index.load_vector_database()
 
-    u = User(128)
+    u = User("MrPeanut02")
 
     u.debug_plot_watchlist()
 
