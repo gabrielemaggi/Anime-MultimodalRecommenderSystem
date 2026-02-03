@@ -41,8 +41,8 @@ class Indexing:
         self._dataset_df = None
 
         # Fusion settings (store for encoding queries)
-        self.fusion_method = 'mean'
-        self.fusion_weights = None
+        self.fusion_method = 'weighted'
+        self.fusion_weights = [0.7, 0.1, 0.2]
 
 
     def _load_dataset(self) -> pd.DataFrame:
@@ -148,7 +148,6 @@ class Indexing:
 
         print("✅ Vector database built successfully!")
 
-
     def _create_visual_embeddings(self):
         """Create visual embeddings from image directory"""
         image_paths = [
@@ -161,7 +160,6 @@ class Indexing:
 
         self.visual_encoder = VisualEncoder(model_size='small')
         return self.visual_encoder.encode(image_paths)
-
 
     def _align_embeddings(self, synopsis_emb, visual_emb, tabular_emb) -> dict:
         """
@@ -190,7 +188,6 @@ class Indexing:
             'visual': [vis_dict[id] for id in common_ids],
             'tabular': [tab_dict[id] for id in common_ids]
         }
-
 
     def _fuse_embeddings(self, aligned_data: dict, method: str,
                         weights: Optional[List[float]] = None) -> np.ndarray:
@@ -225,7 +222,6 @@ class Indexing:
 
         return fused
 
-
     def _fuse_single_embeddings(self, synopsis_emb: np.ndarray,
                                visual_emb: np.ndarray,
                                tabular_emb: np.ndarray) -> np.ndarray:
@@ -251,7 +247,6 @@ class Indexing:
             return weighted_sum
         else:
             raise ValueError(f"Unsupported fusion method: {method}")
-
 
     def _create_vector_database(self, fused_embeddings: np.ndarray, anime_ids: List[str]):
         """
@@ -303,7 +298,7 @@ class Indexing:
         dimension = embeddings_matrix.shape[1]
 
         # Initialize and populate vector database
-        self.vector_db = VectorDatabase(dimension, distance="cosine")
+        self.vector_db = VectorDatabase(dimension)
         self.vector_db.add_vectors(embeddings_matrix, metadata_list)
 
         print(f"✅ Vector DB created with {len(metadata_list)} items")
@@ -312,7 +307,6 @@ class Indexing:
 
         # Save database
         self.vector_db.save(self.anime_db_index, self.anime_db_metadata)
-
 
     def load_vector_database(self):
         """Load existing vector database"""
@@ -328,11 +322,10 @@ class Indexing:
         temp_index = faiss.read_index(self.anime_db_index)
         dimension = temp_index.d
 
-        self.vector_db = VectorDatabase(dimension, distance="cosine")
+        self.vector_db = VectorDatabase(dimension)
         self.vector_db.load(self.anime_db_index, self.anime_db_metadata)
 
         print(f"✅ Vector database loaded: {len(self.vector_db.metadata)} items, dim={dimension}")
-
 
     def encode_by_id(self, anime_id: Union[str, int]) -> np.ndarray:
         """
@@ -357,7 +350,6 @@ class Indexing:
         row_data = row.iloc[0].to_dict()
         # Encode using the row data
         return self.encode_from_data(row_data, anime_id=anime_id)
-
 
     def encode_from_data(self, data: Dict, anime_id: Optional[Union[str, int]] = None,
                         image_path: Optional[str] = None) -> np.ndarray:
@@ -426,9 +418,20 @@ class Indexing:
             visual_embedding,
             tabular_embedding
         )
-
+        # self.vector_db.add if save
         return fused_embedding
 
+    def encode_image(self, image):
+        self._ensure_encoders_loaded()
+        return self.visual_encoder.run_model(image)
+
+    def encode_sypnopsis(self, text):
+        self._ensure_encoders_loaded()
+        return self.synopsis_encoder.run_model(text)
+
+    def encode_tabular(self, anime_title):
+        self._ensure_encoders_loaded()
+        return self.synopsis_encoder.run_model(anime_title)
 
     def search(self, query_embedding: np.ndarray, top_k: int = 5) -> List[dict]:
         """
