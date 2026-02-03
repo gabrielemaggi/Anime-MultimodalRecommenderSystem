@@ -42,6 +42,7 @@ class VectorDatabase:
 
     def search(self, query_vector: np.ndarray, k: int = 5):
         """Search for k nearest neighbors (returns full metadata)"""
+        print(query_vector)
         query_vector = query_vector.astype('float32').reshape(1, -1)
 
         # Normalize for cosine similarity

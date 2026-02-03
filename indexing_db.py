@@ -11,6 +11,7 @@ from SynopsisEncoder import *
 from TabularEncoder import *
 from VectorDatabase import *
 from Fusion import *
+from trainableFusion import *
 
 import torch.nn.functional as F
 
@@ -41,8 +42,9 @@ class Indexing:
         self._dataset_df = None
 
         # Fusion settings (store for encoding queries)
-        self.fusion_method = 'concatenate'
+        self.fusion_method = 'trainable'
         self.fusion_weights = [0.7, 0.1, 0.2]
+        self.fusion_engine = None
 
 
     def _load_dataset(self) -> pd.DataFrame:
@@ -235,23 +237,30 @@ class Indexing:
             ]
             for i, item_id in enumerate(aligned_data['ids'])
         }
+        if method == 'trainable':
+            syn_embeddings = np.array(aligned_data['synopsis'])
+            vis_embeddings = np.array(aligned_data['visual'])
+            tab_embeddings = np.array(aligned_data['tabular'])
 
-        fusion_engine = Fusion(joint_dict)
-
-        if method == 'mean':
-            fused = fusion_engine.mean_fusion()
-        elif method == 'concatenate':
-            fused = fusion_engine.concatenate()
-        elif method == 'weighted':
-            if weights is None:
-                weights = [0.4, 0.4, 0.2]
-            fused = fusion_engine.weighted_average_fusion(weights=weights)
+            fusion_engine = FusionTrainer(np.array(aligned_data['ids']), syn_embeddings, vis_embeddings, tab_embeddings, 384)
+            fusion_engine.train()
+            fused = fusion_engine.transform()
         else:
-            raise ValueError(f"Unsupported fusion method: {method}")
+            fusion_engine = Fusion(joint_dict)
+            if method == 'mean':
+                fused = fusion_engine.mean_fusion()
+            elif method == 'concatenate':
+                fused = fusion_engine.concatenate()
+            elif method == 'weighted':
+                if weights is None:
+                    weights = [0.4, 0.4, 0.2]
+                fused = fusion_engine.weighted_average_fusion(weights=weights)
+            else:
+                raise ValueError(f"Unsupported fusion method: {method}")
 
         return fused
 
-    def _fuse_single_embeddings(self, synopsis_emb: np.ndarray,
+    def _fuse_single_embeddings(self, anime_id, synopsis_emb: np.ndarray,
                                visual_emb: np.ndarray,
                                tabular_emb: np.ndarray) -> np.ndarray:
         """
@@ -263,19 +272,25 @@ class Indexing:
         method = self.fusion_method
         weights = self.fusion_weights
 
-        if method == 'mean':
-            return np.mean([synopsis_emb, visual_emb, tabular_emb], axis=0)
-        elif method == 'concatenate':
-            return np.concatenate([synopsis_emb, visual_emb, tabular_emb])
-        elif method == 'weighted':
-            if weights is None:
-                weights = [0.4, 0.4, 0.2]
-            weighted_sum = (weights[0] * synopsis_emb +
-                          weights[1] * visual_emb +
-                          weights[2] * tabular_emb)
-            return weighted_sum
+        if method == 'trainable':
+            fusion_engine = FusionTrainer(anime_id, synopsis_emb, visual_emb, tabular_emb, 384, load_model=True)
+            fusion_engine.train()
+            fused = fusion_engine.transform()
+            return fused
         else:
-            raise ValueError(f"Unsupported fusion method: {method}")
+            if method == 'mean':
+                return np.mean([synopsis_emb, visual_emb, tabular_emb], axis=0)
+            elif method == 'concatenate':
+                return np.concatenate([synopsis_emb, visual_emb, tabular_emb])
+            elif method == 'weighted':
+                if weights is None:
+                    weights = [0.4, 0.4, 0.2]
+                weighted_sum = (weights[0] * synopsis_emb +
+                                weights[1] * visual_emb +
+                                weights[2] * tabular_emb)
+                return weighted_sum
+            else:
+                raise ValueError(f"Unsupported fusion method: {method}")
 
     def _create_vector_database(self, fused_embeddings: np.ndarray, anime_ids: List[str]):
         """
@@ -311,7 +326,7 @@ class Indexing:
             # Get metadata
             meta = metadata_lookup.get(str_id)
             if meta is None:
-                print(f"⚠️ Warning: Metadata missing for ID {str_id}, skipping...")
+                print(f"Warning: Metadata missing for ID {str_id}, skipping...")
                 continue
 
             # Add ID to metadata
@@ -330,7 +345,7 @@ class Indexing:
         self.vector_db = VectorDatabase(dimension)
         self.vector_db.add_vectors(embeddings_matrix, metadata_list)
 
-        print(f"✅ Vector DB created with {len(metadata_list)} items")
+        print(f"Vector DB created with {len(metadata_list)} items")
         print(f"   - Metadata fields: {list(metadata_list[0].keys())}")
         print(f"   - Embedding dimension: {dimension}")
 
@@ -354,7 +369,7 @@ class Indexing:
         self.vector_db = VectorDatabase(dimension)
         self.vector_db.load(self.anime_db_index, self.anime_db_metadata)
 
-        print(f"✅ Vector database loaded: {len(self.vector_db.metadata)} items, dim={dimension}")
+        print(f"Vector database loaded: {len(self.vector_db.metadata)} items, dim={dimension}")
 
     def encode_by_id(self, anime_id: Union[str, int]) -> np.ndarray:
         """
@@ -443,12 +458,16 @@ class Indexing:
 
         # 4. Fuse embeddings
         fused_embedding = self._fuse_single_embeddings(
+            anime_id,
             synopsis_embedding,
             visual_embedding,
             tabular_embedding
         )
+        print("*"*500)
+        print(fused_embedding.get('embedding'))
+        print("*"*50)
         # self.vector_db.add if save
-        return fused_embedding
+        return fused_embedding.get('embedding')
 
     def encode_image(self, image):
         self._ensure_encoders_loaded()
@@ -478,7 +497,6 @@ class Indexing:
 
         return self.vector_db.search(query_embedding, k=top_k)
 
-
     def search_by_id(self, anime_id: Union[str, int], top_k: int = 5) -> List[dict]:
         """
         Find similar anime by encoding an anime ID from the dataset
@@ -492,7 +510,6 @@ class Indexing:
         """
         query_embedding = self.encode_by_id(anime_id)
         return self.search(query_embedding, top_k=top_k)
-
 
     def search_by_data(self, data: Dict, top_k: int = 5,
                       image_path: Optional[str] = None) -> List[dict]:
