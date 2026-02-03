@@ -95,9 +95,9 @@ with results_container:
                         with st.container(border=True):
                             img_path = find_anime_image(anime_id)
                             if img_path:
-                                st.image(img_path, use_container_width=True)
+                                st.image(img_path, width='stretch')
                             else:
-                                st.image("https://via.placeholder.com/200x300?text=No+Image", use_container_width=True)
+                                st.image("https://via.placeholder.com/200x300?text=No+Image", width='stretch')
 
                             title = anime.get("title", "Unknown Title")
                             st.markdown(f"**{title}**")
@@ -107,7 +107,7 @@ with results_container:
                                 st.caption(f"🎯 Similarity: {float(similarity)*100:.1f}%")
 
                             synopsis = anime.get("sypnopsis", "No synopsis available.")
-                            if len(synopsis) > 100:
+                            if len(str(synopsis)) > 100:
                                 with st.expander("Read synopsis"):
                                     st.write(synopsis)
                             else:
