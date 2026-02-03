@@ -9,8 +9,8 @@ class SimpleFusion(nn.Module):
     """Minimal trainable fusion with InfoNCE loss"""
     def __init__(self, syn_dim: int, vis_dim: int, tab_dim: int, output_dim: int = 256):
         super().__init__()
-        self.proj = nn.Linear(syn_dim + vis_dim + tab_dim, output_dim)
         self.output_dim = output_dim
+        self.proj = nn.Linear(syn_dim + vis_dim + tab_dim, self.output_dim)
 
     def forward(self, syn, vis, tab):
         # 1. L2-normalize each modality (critical!)
@@ -23,8 +23,36 @@ class SimpleFusion(nn.Module):
         # 3. L2-normalize final embedding (for cosine similarity)
         return F.normalize(x, p=2, dim=-1)
 
+
+class CoMMFusion(nn.Module):
+    def __init__(self, syn_dim, vis_dim, tab_dim, output_dim=256):
+        super().__init__()
+        # Independent encoders to map different input sizes to the same shared space
+        self.enc_syn = nn.Sequential(nn.Linear(syn_dim, output_dim), nn.ReLU(), nn.Linear(output_dim, output_dim))
+        self.enc_vis = nn.Sequential(nn.Linear(vis_dim, output_dim), nn.ReLU(), nn.Linear(output_dim, output_dim))
+        self.enc_tab = nn.Sequential(nn.Linear(tab_dim, output_dim), nn.ReLU(), nn.Linear(output_dim, output_dim))
+
+        self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
+        self.output_dim = output_dim
+
+    def forward(self, syn, vis, tab, return_centroid=False):
+
+        # Project and normalize
+        z_s = F.normalize(self.enc_syn(syn), p=2, dim=-1)
+        z_v = F.normalize(self.enc_vis(vis), p=2, dim=-1)
+        z_t = F.normalize(self.enc_tab(tab), p=2, dim=-1)
+
+        # The "Centroid" is the CoMM representation
+        centroid = (z_s + z_v + z_t) # / 3
+        centroid = F.normalize(centroid, p=2, dim=-1)
+
+        if return_centroid:
+            return z_s, z_v, z_t, centroid
+        return centroid
+
+
+
 class FusionTrainer:
-    """Bare-minimum trainer using in-batch negatives (SimCLR style)"""
     def __init__(self, item_ids, syn_embs, vis_embs, tab_embs, output_dim=256, load_model=False):
         self.syn_embs = syn_embs.astype('float32')
         self.vis_embs = vis_embs.astype('float32')
@@ -34,52 +62,68 @@ class FusionTrainer:
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.save_path = "my_fusion_v1.pt"
 
-        self.model = SimpleFusion(384, 384, 384, 384)
+        self.model = CoMMFusion(384, 384, 384, 384)
 
         if load_model:
              self.model = self.load(self.save_path, self.device)
         else:
-            self.model = SimpleFusion(
+            self.model = CoMMFusion(
                 syn_embs.shape[1],
                 vis_embs.shape[1],
                 tab_embs.shape[1],
                 output_dim
             ).to(self.device)
 
-    def train(self, epochs=10, batch_size=64, lr=3e-4, temperature=0.07):
-        if not os.path.exists(self.save_path):
-            optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr)
-            dataset = TensorDataset(self.syn_embs, self.vis_embs, self.tab_embs)
-            loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-            for epoch in range(epochs):
-                total_loss = 0
-                for syn, vis, tab in loader:
-                    # Move to device
-                    syn, vis, tab = syn.to(self.device), vis.to(self.device), tab.to(self.device)
+    def comm_loss(self, z_s, z_v, z_t, centroid, temperature=0.07):
+        """
+        CoMM Alignment: Each modality is pulled towards the shared centroid.
+        """
+        batch_size = z_s.size(0)
+        labels = torch.arange(batch_size, device=self.device)
 
-                    # Create two augmented views via modality dropout (minimal augmentation)
-                    mask1 = torch.rand_like(syn) > 0.1  # 10% dropout
-                    mask2 = torch.rand_like(syn) > 0.1
+        # 1. Similarity of each modality to the shared Centroid
+        # We use the logit_scale (temperature) to sharpen the distribution
+        logits_s = torch.matmul(z_s, centroid.T) / temperature
+        logits_v = torch.matmul(z_v, centroid.T) / temperature
+        logits_t = torch.matmul(z_t, centroid.T) / temperature
 
-                    view1 = self.model(syn * mask1, vis * mask1, tab * mask1)
-                    view2 = self.model(syn * mask2, vis * mask2, tab * mask2)
+        # 2. Multi-modal Cross Entropy
+        # This enforces that syn[i] identifies centroid[i], vis[i] identifies centroid[i], etc.
+        loss_s = F.cross_entropy(logits_s, labels)
+        loss_v = F.cross_entropy(logits_v, labels)
+        loss_t = F.cross_entropy(logits_t, labels)
 
-                    # InfoNCE loss: view1[i] ↔ view2[i] are positives
-                    logits = (view1 @ view2.T) / temperature
-                    labels = torch.arange(len(view1), device=self.device)
-                    loss = F.cross_entropy(logits, labels)
+        return (loss_s + loss_v + loss_t) / 3
 
-                    optimizer.zero_grad()
-
-                    loss.backward()
-                    optimizer.step()
-                    total_loss += loss.item()
-
-                print(f"Epoch {epoch+1}/{epochs} | Loss: {total_loss/len(loader):.4f}")
-            self.save(self.save_path)
-        else:
+    def train(self, epochs=50, batch_size=128):
+        if os.path.exists(self.save_path):
             self.load(self.save_path)
-        return self.model
+            return self.model
+
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=1e-4, weight_decay=1e-2)
+        loader = DataLoader(TensorDataset(self.syn_embs, self.vis_embs, self.tab_embs),
+                            batch_size=batch_size, shuffle=True)
+
+        for epoch in range(epochs):
+            self.model.train()
+            total_loss = 0
+            for syn, vis, tab in loader:
+                syn, vis, tab = syn.to(self.device), vis.to(self.device), tab.to(self.device)
+
+                # Get individual views and the shared centroid
+                z_s, z_v, z_t, centroid = self.model(syn, vis, tab, return_centroid=True)
+
+                # Calculate CoMM loss
+                loss = self.comm_loss(z_s, z_v, z_t, centroid)
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
+
+            print(f"Epoch {epoch+1} | CoMM Loss: {total_loss/len(loader):.4f}")
+
+        self.save(self.save_path)
 
     def transform(self, syn_embs=None, vis_embs=None, tab_embs=None, as_list: bool = False):
         """

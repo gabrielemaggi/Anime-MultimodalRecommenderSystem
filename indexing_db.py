@@ -237,6 +237,7 @@ class Indexing:
             ]
             for i, item_id in enumerate(aligned_data['ids'])
         }
+
         if method == 'trainable':
             syn_embeddings = np.array(aligned_data['synopsis'])
             vis_embeddings = np.array(aligned_data['visual'])
@@ -276,21 +277,28 @@ class Indexing:
             fusion_engine = FusionTrainer(anime_id, synopsis_emb, visual_emb, tabular_emb, 384, load_model=True)
             fusion_engine.train()
             fused = fusion_engine.transform()
-            return fused
+
         else:
+            joint_dict = {
+                anime_id: [
+                    synopsis_emb,
+                    visual_emb,
+                    tabular_emb
+                ]
+            }
+            fusion_engine = Fusion(joint_dict)
             if method == 'mean':
-                return np.mean([synopsis_emb, visual_emb, tabular_emb], axis=0)
+                fused = fusion_engine.mean_fusion()
             elif method == 'concatenate':
-                return np.concatenate([synopsis_emb, visual_emb, tabular_emb])
+                fused = fusion_engine.concatenate()
             elif method == 'weighted':
                 if weights is None:
                     weights = [0.4, 0.4, 0.2]
-                weighted_sum = (weights[0] * synopsis_emb +
-                                weights[1] * visual_emb +
-                                weights[2] * tabular_emb)
-                return weighted_sum
+                fused = fusion_engine.weighted_average_fusion(weights=weights)
             else:
                 raise ValueError(f"Unsupported fusion method: {method}")
+
+        return fused
 
     def _create_vector_database(self, fused_embeddings: np.ndarray, anime_ids: List[str]):
         """
@@ -463,9 +471,7 @@ class Indexing:
             visual_embedding,
             tabular_embedding
         )
-        print("*"*500)
-        print(fused_embedding.get('embedding'))
-        print("*"*50)
+
         # self.vector_db.add if save
         return fused_embedding.get('embedding')
 

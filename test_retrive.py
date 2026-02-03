@@ -57,7 +57,7 @@ if __name__ == "__main__":
     jojo = 666
     blackclover = 34572
 
-    query = indexer.encode_by_id(blackclover)
+    query = indexer.encode_by_id(nana)
     # v = indexer.encode_image(image)
     # s = indexer.encode_sypnopsis(data)
     # t = indexer.encode_tabular("Kishibe Rohan wa Ugokanai")
