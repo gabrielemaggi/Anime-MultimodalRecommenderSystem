@@ -141,9 +141,9 @@ if __name__ == "__main__":
     index = Indexing()
     index.load_vector_database()
 
-    u = User(1289601)
+    u = User(128)
 
     u.debug_plot_watchlist()
 
     u.findCentersOfClusters()
-    print(u.get_nearest_anime_from_clusters(index, 5))
+    print(u.get_nearest_anime_from_clusters(index, 10))

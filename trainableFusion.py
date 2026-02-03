@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
 import os
+import copy
 
 class SimpleFusion(nn.Module):
     """Minimal trainable fusion with InfoNCE loss"""
@@ -95,7 +96,7 @@ class FusionTrainer:
 
         return (loss_s + loss_v + loss_t) / 3
 
-    def train(self, epochs=50, batch_size=128):
+    def train_2(self, epochs=50, batch_size=128):
         if os.path.exists(self.save_path):
             self.load(self.save_path)
             return self.model
@@ -122,6 +123,56 @@ class FusionTrainer:
                 total_loss += loss.item()
 
             print(f"Epoch {epoch+1} | CoMM Loss: {total_loss/len(loader):.4f}")
+
+        self.save(self.save_path)
+
+    def train(self, epochs=500, batch_size=512, patience=5, min_delta=1e-4):
+        if os.path.exists(self.save_path):
+            self.load(self.save_path)
+            return self.model
+
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=1e-4, weight_decay=1e-2)
+
+        # --- Early Stopping Setup ---
+        best_loss = float('inf')
+        epochs_no_improve = 0
+        best_model_wts = copy.deepcopy(self.model.state_dict())
+
+        # Note: Ideally, use a separate validation loader here.
+        # For this example, we will monitor the training loss trend.
+        loader = DataLoader(TensorDataset(self.syn_embs, self.vis_embs, self.tab_embs),
+                            batch_size=batch_size, shuffle=True)
+
+        for epoch in range(epochs):
+            self.model.train()
+            total_loss = 0
+
+            for syn, vis, tab in loader:
+                syn, vis, tab = syn.to(self.device), vis.to(self.device), tab.to(self.device)
+
+                z_s, z_v, z_t, centroid = self.model(syn, vis, tab, return_centroid=True)
+                loss = self.comm_loss(z_s, z_v, z_t, centroid)
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
+
+            avg_loss = total_loss / len(loader)
+            print(f"Epoch {epoch+1} | CoMM Loss: {avg_loss:.4f}")
+
+            # --- Early Stopping Logic ---
+            if avg_loss < best_loss - min_delta:
+                best_loss = avg_loss
+                best_model_wts = copy.deepcopy(self.model.state_dict())
+                epochs_no_improve = 0
+            else:
+                epochs_no_improve += 1
+                if epochs_no_improve >= patience:
+                    print(f"Early stopping triggered at epoch {epoch+1}")
+                    # Load the best weights before exiting
+                    self.model.load_state_dict(best_model_wts)
+                    break
 
         self.save(self.save_path)
 
