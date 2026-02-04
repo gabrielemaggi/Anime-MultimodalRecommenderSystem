@@ -44,8 +44,8 @@ class TabularEncoder():
         self.G = nx.Graph()
         print("Building graph with weighted edges...")
 
-        BASE_GENRE_WEIGHT = 0.7
-        BASE_STUDIO_WEIGHT = 2.0
+        BASE_GENRE_WEIGHT = 1.0
+        BASE_STUDIO_WEIGHT = 1.0
 
         for index, row in self.df.iterrows():
             anime_node = f"Anime_{row['title']}"
@@ -221,25 +221,125 @@ class TabularEncoder():
                     print(f"Did you mean one of these? {similar_titles[:3]}")
             return None
 
+    def test_genre_studio_embeddings(self):
+        """
+        Test function to retrieve embeddings for genre and studio nodes.
+        Returns embeddings for specified genres and studios.
+        """
+        if self.model is None:
+            print("Error: Model not loaded. Call fit_or_load() or load_embeddings() first.")
+            return None
+
+        # Handle difference between Word2Vec and KeyedVectors
+        vectors = self.model.wv if hasattr(self.model, 'wv') else self.model
+
+        results = {
+            'genres': {},
+            'studios': {}
+        }
+
+        # Get all available genre and studio nodes
+        available_genres = []
+        available_studios = []
+
+        for node_key in vectors.index_to_key:
+            if node_key.startswith('Genre_'):
+                available_genres.append(node_key.replace('Genre_', ''))
+            elif node_key.startswith('Studio_'):
+                available_studios.append(node_key.replace('Studio_', ''))
+
+        print(f"\n--- Available Genres ({len(available_genres)}) ---")
+        print(available_genres[:10], "..." if len(available_genres) > 10 else "")
+
+        print(f"\n--- Available Studios ({len(available_studios)}) ---")
+        print(available_studios[:10], "..." if len(available_studios) > 10 else "")
+
+        # Get embeddings for genres
+        for genre in available_genres:
+            node_key = f"Genre_{genre}"
+            if node_key in vectors:
+                results['genres'][genre] = vectors[node_key]
+
+        # Get embeddings for studios
+        for studio in available_studios:
+            node_key = f"Studio_{studio}"
+            if node_key in vectors:
+                results['studios'][studio] = vectors[node_key]
+
+        print(f"\n--- Embedding Retrieval Complete ---")
+        print(f"Retrieved {len(results['genres'])} genre embeddings")
+        print(f"Retrieved {len(results['studios'])} studio embeddings")
+        print(f"Embedding dimension: {self.embedding_dim}")
+
+        return results
+
+    def get_specific_embeddings(self, genres=None, studios=None):
+        """
+        Get embeddings for specific genres and/or studios.
+
+        Args:
+            genres: List of genre names (e.g., ['Action', 'Comedy'])
+            studios: List of studio names (e.g., ['Toei Animation', 'Madhouse'])
+
+        Returns:
+            Dictionary with genre and studio embeddings
+        """
+
+        if self.model is None:
+            self.load_embeddings()
+
+        vectors = self.model.wv if hasattr(self.model, 'wv') else self.model
+
+        results = {
+            'genres': {},
+            'studios': {}
+        }
+
+        # Get genre embeddings
+        if genres:
+            for genre in genres:
+                node_key = f"Genre_{genre}"
+                if node_key in vectors:
+                    results['genres'][genre] = vectors[node_key]
+                    print(f"✓ Found embedding for genre: {genre}")
+                else:
+                    print(f"✗ Genre not found: {genre}")
+
+        # Get studio embeddings
+        if studios:
+            for studio in studios:
+                node_key = f"Studio_{studio}"
+                if node_key in vectors:
+                    results['studios'][studio] = vectors[node_key]
+                    print(f"✓ Found embedding for studio: {studio}")
+                else:
+                    print(f"✗ Studio not found: {studio}")
+
+        return results
+
 # --- MAIN TEST SCRIPT ---
 if __name__ == "__main__":
 
-    # 1. Configuration with requested filenames
     csv_file = 'AnimeList.csv'
 
-    # Define the specific filenames you requested
-    recommender = TabularEncoder(
-        csv_path=csv_file,
-        model_path='anime_node2vec_weighted.model',  # Gensim format
-        vectors_path='anime_embeddings.vec',  # Text format
-        embedding_dim=384  # Kept small for faster testing, use 384 for production
-    )
+    recommender = TabularEncoder(embedding_dim=384)
 
     print("--- 1. STARTING PIPELINE ---")
-    # This will train ONLY if files don't exist.
-    # Otherwise it loads 'anime_node2vec_weighted.model' or 'anime_node2vec.pt'
     recommender.fit_or_load()
 
-    print("\n--- 2. TESTING RECOMMENDATIONS ---")
-    # Replace 'Naruto' with an actual title from your CSV
-    recommender.recommend("Naruto", top_k=5)
+    print("\n--- 2. TESTING GENRE AND STUDIO EMBEDDINGS ---")
+    all_embeddings = recommender.test_genre_studio_embeddings()
+
+    # Example: Get specific embeddings
+    print("\n--- 3. GETTING SPECIFIC EMBEDDINGS ---")
+    specific = recommender.get_specific_embeddings(
+        genres=['Action', 'Comedy', 'Drama'],
+        studios=['Toei Animation', 'Madhouse', 'Bones']
+    )
+
+    # Display sample embedding
+    if specific['genres']:
+        sample_genre = list(specific['genres'].keys())[0]
+        print(f"\nSample embedding for '{sample_genre}':")
+        print(f"Shape: {specific['genres'][sample_genre].shape}")
+        print(f"First 5 values: {specific['genres'][sample_genre][:5]}")
