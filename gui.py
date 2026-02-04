@@ -10,7 +10,8 @@ from User import User
 # ---------------------------------------------------------------------------
 # Configurazione Pagina (Deve essere la prima istruzione Streamlit)
 # ---------------------------------------------------------------------------
-st.set_page_config(page_title="Anime Recommendation System", layout="centered")
+# MODIFICATO: layout="wide" per riempire la pagina orizzontalmente
+st.set_page_config(page_title="Anime Recommendation System", layout="wide")
 
 
 # caching of models
@@ -28,6 +29,7 @@ def load_models():
 
     return syn_model, vis_model, index
 
+
 @st.cache_data
 def get_anime_lookup():
     """
@@ -37,24 +39,59 @@ def get_anime_lookup():
     df = pd.read_csv("dataset/AnimeList.csv")
     # Crea un dizionario indicizzato per ID per accesso istantaneo
     # Orient='index' crea un dict tipo: {123: {'title_english': '...', ...}, 456: {...}}
-    return df.set_index('id').to_dict(orient='index') # Osa 'id' o 'MAL_ID' in base al tuo CSV
+    return df.set_index('id').to_dict(orient='index')  # Osa 'id' o 'MAL_ID' in base al tuo CSV
 
 
 # load models
 prompt_encoder_model, image_encoder_model, index = load_models()
 
-# css for rounded buttons
+# css for rounded buttons AND uniform tiles
 st.markdown(
     """
 <style>
+    /* Allinea verticalmente gli elementi nelle colonne */
     div[data-testid="column"] {
         display: flex;
-        align-items: center;
+        flex-direction: column; 
     }
+
     .stButton button {
         width: 100%;
         border-radius: 10px;
         height: 48px;
+    }
+
+    /* --- NUOVO CSS PER TILES UNIFORMI --- */
+
+    /* Forza altezza fissa per il contenitore dell'immagine */
+    div[data-testid="stImage"] {
+        height: 350px;       /* Altezza fissa dell'area immagine */
+        overflow: hidden;    /* Nasconde l'eccesso */
+        display: flex;
+        align-items: center;
+        justify_content: center;
+        border-radius: 8px;  /* Arrotondamento opzionale */
+        margin-bottom: 10px;
+    }
+
+    /* Forza l'immagine a coprire l'area senza deformarsi (crop automatico) */
+    div[data-testid="stImage"] img {
+        height: 100% !important;
+        width: 100% !important;
+        object-fit: cover !important; 
+    }
+
+    /* Stile per i titoli fissi */
+    .anime-title-card {
+        height: 50px;        /* Altezza fissa per il titolo (circa 2 righe) */
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2; /* Numero massimo di righe */
+        -webkit-box-orient: vertical;
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 5px;
     }
 </style>
 """,
@@ -116,7 +153,8 @@ if page_selection == "Recommendations":
         if st.session_state.results:
             st.subheader(f"Suggestions for: {user_name or 'Unknown User'}")
 
-            IMG_PER_ROW = 3
+            # MODIFICATO: Aumentato a 5 o 6 colonne dato che usiamo layout="wide"
+            IMG_PER_ROW = 5
             total_results = len(st.session_state.results)
 
             for i in range(0, total_results, IMG_PER_ROW):
@@ -127,6 +165,7 @@ if page_selection == "Recommendations":
                         anime = st.session_state.results[idx]
                         anime_id = str(anime.get("id", ""))
                         with cols[j]:
+                            # Container con border=True crea l'effetto "Card"
                             with st.container(border=True):
                                 img_path = find_anime_image(anime_id)
                                 # print(type(img_path)) # Debug rimosso per pulizia UI
@@ -139,7 +178,9 @@ if page_selection == "Recommendations":
                                     )
 
                                 title = anime.get("title", "Unknown Title")
-                                st.markdown(f"**{title}**")
+                                # MODIFICATO: Usa HTML raw per forzare altezza e stile del titolo
+                                st.markdown(f'<div class="anime-title-card" title="{title}">{title}</div>',
+                                            unsafe_allow_html=True)
 
                                 similarity = anime.get("similarity")
                                 if similarity:
@@ -150,13 +191,14 @@ if page_selection == "Recommendations":
                                 # --- Rating Input ---
                                 with st.form(key=f"form_rec_{anime_id}"):
                                     rating = st.number_input(
-                                        "Rate (1-10)",
+                                        "Rate",
                                         min_value=1,
                                         max_value=10,
                                         value=5,
+                                        label_visibility="collapsed",  # Risparmia spazio verticale
                                         key=f"val_rec_{anime_id}",
                                     )
-                                    submit_rating = st.form_submit_button("Submit Rating")
+                                    submit_rating = st.form_submit_button("Vote")
 
                                 if submit_rating:
                                     if user_name:
@@ -178,7 +220,7 @@ if page_selection == "Recommendations":
                                             )
                                             st.session_state.results = new_results
 
-                                        st.success(f"Added {title} to your list!")
+                                        st.success(f"Added {title}!")
                                         st.rerun()
                                     else:
                                         st.error("Please enter a user name first.")
@@ -293,81 +335,84 @@ if page_selection == "Recommendations":
 # PAGINA 2: USER HISTORY
 # ---------------------------------------------------------------------------
 elif page_selection == "User History":
-        # ... (codice header utente) ...
+    # ... (codice header utente) ...
 
-        if user_name:
-            try:
-                user = User(int(user_name) if user_name.isdigit() else user_name)
-                raw_watchlist = user.get_watchList()
+    if user_name:
+        try:
+            user = User(int(user_name) if user_name.isdigit() else user_name)
+            raw_watchlist = user.get_watchList()
 
-                if not raw_watchlist:
-                    st.info("No history.")
-                else:
-                    # 1. Carica il dizionario veloce (lo fa una volta sola e lo mette in cache)
-                    anime_lookup = get_anime_lookup()
+            if not raw_watchlist:
+                st.info("No history.")
+            else:
+                # 1. Carica il dizionario veloce (lo fa una volta sola e lo mette in cache)
+                anime_lookup = get_anime_lookup()
 
-                    clean_history = []
+                clean_history = []
 
-                    # 2. Ciclo ora velocissimo
-                    for item in raw_watchlist:
-                        anime_id = item[0]
-                        score = item[1]
+                # 2. Ciclo ora velocissimo
+                for item in raw_watchlist:
+                    anime_id = item[0]
+                    score = item[1]
 
-                        # Lookup istantaneo nel dizionario (niente scansione righe!)
-                        anime_info = anime_lookup.get(anime_id)
+                    # Lookup istantaneo nel dizionario (niente scansione righe!)
+                    anime_info = anime_lookup.get(anime_id)
 
-                        if anime_info:
-                            # Gestione Titolo (Priorità: Inglese -> Giapponese -> Sconosciuto)
-                            title = anime_info.get('title_english')
-                            if pd.isna(title):
-                                title = anime_info.get('title_japanese')
-                            if pd.isna(title):
-                                title = f"Unknown Title (ID: {anime_id})"
-                        else:
-                            title = f"Unknown ID: {anime_id}"
+                    if anime_info:
+                        # Gestione Titolo (Priorità: Inglese -> Giapponese -> Sconosciuto)
+                        title = anime_info.get('title_english')
+                        if pd.isna(title):
+                            title = anime_info.get('title_japanese')
+                        if pd.isna(title):
+                            title = f"Unknown Title (ID: {anime_id})"
+                    else:
+                        title = f"Unknown ID: {anime_id}"
 
-                        clean_history.append({
-                            'id': anime_id,
-                            'title': title,
-                            'rating': score
-                        })
+                    clean_history.append({
+                        'id': anime_id,
+                        'title': title,
+                        'rating': score
+                    })
 
-                # 4. Visualizzazione a Griglia
-                IMG_PER_ROW = 3
-                total_items = len(clean_history)
+            # 4. Visualizzazione a Griglia
+            # MODIFICATO: Aumentato colonne per layout wide
+            IMG_PER_ROW = 5
+            total_items = len(clean_history)
 
-                for i in range(0, total_items, IMG_PER_ROW):
-                    cols = st.columns(IMG_PER_ROW)
-                    for j in range(IMG_PER_ROW):
-                        idx = i + j
-                        if idx < total_items:
-                            anime_data = clean_history[idx]
+            for i in range(0, total_items, IMG_PER_ROW):
+                cols = st.columns(IMG_PER_ROW)
+                for j in range(IMG_PER_ROW):
+                    idx = i + j
+                    if idx < total_items:
+                        anime_data = clean_history[idx]
 
-                            # Estrazione dati per la card
-                            current_id = str(anime_data['id'])
-                            current_title = anime_data['title']
-                            current_score = anime_data['rating']
+                        # Estrazione dati per la card
+                        current_id = str(anime_data['id'])
+                        current_title = anime_data['title']
+                        current_score = anime_data['rating']
 
-                            with cols[j]:
-                                with st.container(border=True):
-                                    # Trova immagine usando l'ID
-                                    img_path = find_anime_image(current_id)
+                        with cols[j]:
+                            with st.container(border=True):
+                                # Trova immagine usando l'ID
+                                img_path = find_anime_image(current_id)
 
-                                    if img_path:
-                                        st.image(img_path, use_container_width=True)
-                                    else:
-                                        st.image(
-                                            "https://via.placeholder.com/200x300?text=No+Image",
-                                            use_container_width=True,
-                                        )
-                                        st.markdown(f"no image found")
+                                if img_path:
+                                    st.image(img_path, use_container_width=True)
+                                else:
+                                    st.image(
+                                        "https://via.placeholder.com/200x300?text=No+Image",
+                                        use_container_width=True,
+                                    )
+                                    st.markdown(f"no image found")
 
-                                    # Mostra Titolo recuperato dal CSV
-                                    st.markdown(f"**{current_title}**")
+                                # MODIFICATO: Usa div con classe CSS per titolo uniforme
+                                st.markdown(
+                                    f'<div class="anime-title-card" title="{current_title}">{current_title}</div>',
+                                    unsafe_allow_html=True)
 
-                                    # Mostra Score recuperato dalla Watchlist
-                                    st.write(f"🌟 Your Rating: **{current_score}**")
+                                # Mostra Score recuperato dalla Watchlist
+                                st.write(f"🌟 Your Rating: **{current_score}**")
 
-            except Exception as e:
-                st.error(f"Error loading history: {e}")
-                st.caption("Debug Info: Check CSV path and column names (anime_id vs id).")
+        except Exception as e:
+            st.error(f"Error loading history: {e}")
+            st.caption("Debug Info: Check CSV path and column names (anime_id vs id).")
