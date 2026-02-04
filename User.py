@@ -28,13 +28,12 @@ class User:
                 print("no name found ")
 
 
-
     # create a new User in the system
     def createNew(self, username, watched):
         self.userDBConnector = UserDBConnector()
         self.id = self.userDBConnector.get_unused_user_id()
         self.watched = watched
-        self.userDBConnector.add_User(username, watched) #maybe to delete, not sure if neccessary
+        self.userDBConnector.add_User(username, watched)
 
     def get_watchList(self):
         return self.watched
