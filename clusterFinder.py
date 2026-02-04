@@ -21,6 +21,7 @@ class clusterFinder:
             self.vectors.append(embedding)
             self.scores.append(rating)
             # print(embedding)
+
         self.K = int(sqrt(self.num_of_anime / 2 ))
 
     def get_centers(self):

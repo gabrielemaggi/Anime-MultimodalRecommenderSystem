@@ -1,19 +1,32 @@
 import pandas as pd
 from UserDBConnector import UserDBConnector
 from clusterFinder import clusterFinder
+
 from indexing_db import *
 
 class User:
 
     # get a user from the db
-    def __init__(self, id ):
+    def __init__(self, *, id = None , name = None ):
+        if((id == None and name == None) or(id != None and name!= None) ):
+            raise ValueError("must provide id or name")
         self.userDBConnector = UserDBConnector()
         self.embeddings = None
-        if(self.userDBConnector.check_if_user_exists(id)):
-            self.id = id;
-            self.watched = self.userDBConnector.get_anime_watched_by_user(id)
+        if(id != None):
+            if(self.userDBConnector.check_if_user_exists(id)):
+                self.id = id;
+                self.name = self.userDBConnector.get_username_byID(id)
+                self.watched = self.userDBConnector.get_anime_watched_by_user(self.name)
+            else:
+                print("no id found")
         else:
-            print("no id found")
+            if(self.userDBConnector.check_if_user_exists(name)):
+                self.name = name
+                self.id = self.userDBConnector.getUserId_by_name(name)
+                self.watched = self.userDBConnector.get_anime_watched_by_user(self.name)
+            else:
+                print("no name found ")
+
 
 
     # create a new User in the system
@@ -131,8 +144,8 @@ if __name__ == "__main__":
     index = Indexing()
     index.load_vector_database()
 
-    u = User(1289601)
-
+    u = User(id = 2255153)
+    u2 = User(name ='karthiga')
     u.debug_plot_watchlist()
 
     u.findCentersOfClusters()

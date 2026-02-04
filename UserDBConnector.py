@@ -18,20 +18,6 @@ class UserDBConnector:
             print("error with reading the parquet, returning None. ")
             return
 
-    def check_if_user_exists(self, user_id):
-        """
-        Checks if a given user_id exists in the user mapping database.
-        Returns True if found, False otherwise.
-        """
-        # Ensure the mapping dataframe is loaded
-        if self.userMapDf is None:
-            print("Error: User mapping database is not loaded.")
-            return False
-
-        # Check if the user_id exists in the 'user_id' column
-        # We use .values to check for existence efficiently
-        exists = user_id in self.userMapDf['user_id'].values
-        return exists
 
     def get_unused_user_id(self):
         """
@@ -52,9 +38,9 @@ class UserDBConnector:
     def add_User(self, user): # maybe delete.
         pass
 
-    def get_anime_watched_by_user(self, user_id):
+    def get_anime_watched_by_user(self, name):
         """
-        Returns a list of pairs [anime_id, my_score] watched by a specific user_id.
+        Returns a list of pairs [anime_id, my_score] watched by a specific username.
         Each element in the returned list is a list of size 2.
         """
         # Ensure the anime list dataframe is already loaded into memory
@@ -62,11 +48,42 @@ class UserDBConnector:
             print("Error: Anime list not loaded.")
             return []
 
-        # Filter the dataframe for the given user_id
-        user_data = self.userAnimeDF[self.userAnimeDF['user_id'] == user_id]
+        #return the list of animes and thier score as [[anime_id1 , score] , [anime_id2, score ...]
+        return self.userAnimeDF.loc[self.userAnimeDF['username'] == name, ['anime_id', 'my_score']].values.tolist()
 
-        # Select both 'anime_id' and 'my_score' columns and convert to a list of lists
-        # .values.tolist() is highly efficient for creating nested lists in Python
-        watched_data = user_data[['anime_id', 'my_score']].values.tolist()
 
-        return watched_data
+    def check_if_user_exists(self, identifier):
+        if isinstance(identifier, int):
+            # Ensure the mapping dataframe is loaded
+            if self.userMapDf is None:
+                print("Error: User mapping database is not loaded.")
+                return False
+
+            # Check if the user_id exists in the 'user_id' column
+            # We use .values to check for existence efficiently
+            exists = identifier in self.userMapDf['user_id'].values
+            return exists
+        if isinstance(identifier, str):
+            # Ensure the mapping dataframe is loaded
+            if self.userMapDf is None:
+                print("Error: User mapping database is not loaded.")
+                return False
+
+            # Check if the user_id exists in the 'user_id' column
+            # We use .values to check for existence efficiently
+            exists = identifier in self.userMapDf['username'].values
+            return exists
+
+    def getUserId_by_name(self ,name):
+        df = self.userMapDf
+        if df is None:
+            print("Error: User mapping database is not loaded.")
+            return
+        return df.loc[df['username'] == name,'user_id'].iloc[0]
+
+    def get_username_byID(self ,id):
+        df = self.userMapDf
+        if df is None:
+            print("Error: User mapping database is not loaded.")
+            return
+        return  df.loc[df['user_id'] == id, 'username'].iloc[0]
