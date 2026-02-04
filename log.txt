@@ -1,5 +1,0 @@
-Vector database loaded: 14395 items, dim=384
-Initializing Singleton: Loading databases into memory...
-Loaded Anime List from Parquet (Fast).
-Loaded User Mapping from CSV.
-Error loading watchlist: 'User' object has no attribute 'watched'
