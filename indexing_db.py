@@ -44,7 +44,7 @@ class Indexing:
         # Fusion settings (store for encoding queries)
         self.fusion_method = 'trainable'
         self.fusion_weights = [0.7, 0.1, 0.2]
-        self.fusion_engine = None
+        self.fusion_engine = FusionTrainer(load_model=True)
 
 
     def _load_dataset(self) -> pd.DataFrame:
@@ -485,6 +485,22 @@ class Indexing:
     def encode_tabular(self, anime_title):
         self._ensure_encoders_loaded()
         return self.synopsis_encoder.run_model(anime_title)
+
+    def align_embedding(self, embedding, modality):
+        # print(embedding)
+        aligned = self.fusion_engine.encode_single_modality(embedding, modality)
+        return aligned
+
+
+    def encode_tabular_genre_studio(self, genres=None, studios=None):
+        self._ensure_encoders_loaded()
+        # Return a dict of embeddings of genres and/or studio inserted
+        embeddings = self.tabular_encoder.get_specific_embeddings(
+            genres=genres,
+            studios=studios
+        )
+
+        return embeddings
 
     def search(self, query_embedding: np.ndarray, top_k: int = 5) -> List[dict]:
         """

@@ -79,20 +79,31 @@ class CoMMFusion(nn.Module):
 
 
 class FusionTrainer:
-    def __init__(self, item_ids, syn_embs, vis_embs, tab_embs, output_dim=384, load_model=False):
-        self.syn_embs = syn_embs.astype('float32')
-        self.vis_embs = vis_embs.astype('float32')
-        self.tab_embs = tab_embs.astype('float32')
+    def __init__(self, item_ids=None, syn_embs=None, vis_embs=None, tab_embs=None, output_dim=384, load_model=False):
 
-        self.item_ids = item_ids
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.save_path = "./Embeddings/fusion_model.pt"
 
-        self.model = CoMMFusion(384, 384, 384, output_dim)
-
+        # Handle load_model case (model-only initialization)
         if load_model:
-             self.model = self.load(self.save_path, self.device)
+            self.model = CoMMFusion(384, 384, 384, 384)
+            self.model = self.load(self.save_path, self.device)
+            # Initialize embeddings as None - they can be set later if needed
+            self.syn_embs = syn_embs.astype('float32') if syn_embs is not None else None
+            self.vis_embs = vis_embs.astype('float32') if vis_embs is not None else None
+            self.tab_embs = tab_embs.astype('float32') if tab_embs is not None else None
+            self.item_ids = item_ids
+
         else:
+            # Training mode - require embeddings
+            if syn_embs is None or vis_embs is None or tab_embs is None:
+                raise ValueError("When load_model=False, syn_embs, vis_embs, and tab_embs are required for training")
+
+            self.syn_embs = syn_embs.astype('float32')
+            self.vis_embs = vis_embs.astype('float32')
+            self.tab_embs = tab_embs.astype('float32')
+            self.item_ids = item_ids
+
             self.model = CoMMFusion(
                 syn_embs.shape[1],
                 vis_embs.shape[1],
@@ -235,6 +246,43 @@ class FusionTrainer:
 
         self.model.eval()
         return self.model
+
+    def encode_single_modality(self, embedding, modality_type='syn'):
+        """
+        Encode a single modality embedding through its respective encoder.
+        Returns the normalized, aligned embedding in the shared space (NOT the centroid).
+
+        Args:
+            embedding: numpy array or torch tensor of shape (embedding_dim,) or (batch_size, embedding_dim)
+            modality_type: str, one of ['syn', 'vis', 'tab']
+
+        Returns:
+            numpy array of the encoded embedding in the shared space
+        """
+        self.model.eval()
+
+        # Convert to tensor if needed
+        if isinstance(embedding, np.ndarray):
+            embedding = torch.from_numpy(embedding.astype('float32'))
+
+        # Add batch dimension if needed
+        if embedding.dim() == 1:
+            embedding = embedding.unsqueeze(0)
+
+        embedding = embedding.to(self.device)
+
+        with torch.no_grad():
+            # Select the appropriate encoder
+            if modality_type == 'syn':
+                encoded = F.normalize(self.model.enc_syn(embedding), p=2, dim=-1)
+            elif modality_type == 'vis':
+                encoded = F.normalize(self.model.enc_vis(embedding), p=2, dim=-1)
+            elif modality_type == 'tab':
+                encoded = F.normalize(self.model.enc_tab(embedding), p=2, dim=-1)
+            else:
+                raise ValueError(f"Invalid modality_type: {modality_type}. Must be 'syn', 'vis', or 'tab'")
+
+        return encoded.cpu().numpy().squeeze()
 
 class TensorDataset(Dataset):
     def __init__(self, syn, vis, tab):
