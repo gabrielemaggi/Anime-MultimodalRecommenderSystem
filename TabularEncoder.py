@@ -207,7 +207,6 @@ class TabularEncoder():
         vectors = self.model.wv if hasattr(self.model, 'wv') else self.model
 
         node_key = f"Anime_{anime_title}"
-        print(vectors)
 
         if node_key in vectors:
             return vectors[node_key]
