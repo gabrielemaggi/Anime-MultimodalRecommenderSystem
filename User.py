@@ -60,7 +60,7 @@ class User:
         self.userDBConnector = UserDBConnector()
         self.id = self.userDBConnector.get_unused_user_id()
         self.watched = watched
-        self.userDBConnector.add_User(username, watched) #maybe to delete, not sure if neccessary
+        self.userDBConnector.add_User(username, watched) # maybe to delete, not sure if neccessary
 
     def get_watchList(self):
         return self.watched
