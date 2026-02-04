@@ -140,6 +140,32 @@ with st.sidebar:
 
     st.info(f"Current Mode: {page_selection}")
 
+    # -----------------------------------------------------------------------
+    # SPOSTATO: Input Area nella Sidebar (in fondo alla "colonna laterale")
+    # -----------------------------------------------------------------------
+    run_search = False  # Inizializzazione default
+    prompt_text = ""
+    uploaded_file = None
+
+    if page_selection == "Recommendations":
+        st.markdown("---")
+        st.subheader("Search Input")
+
+        # input area (bottom of sidebar)
+        # Ho adattato il layout per la sidebar: stacked invece che riga unica
+        with st.popover("📎 Upload Image", use_container_width=True):
+            uploaded_file = st.file_uploader(
+                "Upload image", type=["png", "jpg", "jpeg"]
+            )
+            if uploaded_file:
+                st.success("Loaded!")
+
+        prompt_text = st.text_input(
+            "Insert a prompt...", label_visibility="collapsed", key="search_input", placeholder="Type here..."
+        )
+
+        run_search = st.button("➤ Suggest", type="primary", help="Run Suggestion")
+
 # ---------------------------------------------------------------------------
 # PAGINA 1: RECOMMENDATIONS (Logica Originale)
 # ---------------------------------------------------------------------------
@@ -225,31 +251,11 @@ if page_selection == "Recommendations":
                                     else:
                                         st.error("Please enter a user name first.")
         else:
-            st.info("Insert a prompt and/or an image and press suggest")
+            st.info("Insert a prompt and/or an image in the Sidebar and press suggest")
             for _ in range(5):
                 st.write("")
 
     st.markdown("---")
-
-    # input area (bottom)
-    with st.container(border=True):
-        col_clip, col_input, col_btn = st.columns([0.05, 0.85, 0.1], gap="small")
-
-        with col_clip:
-            with st.popover("📎", help="Load an image"):
-                uploaded_file = st.file_uploader(
-                    "Upload image", type=["png", "jpg", "jpeg"]
-                )
-                if uploaded_file:
-                    st.success("Loaded!")
-
-        with col_input:
-            prompt_text = st.text_input(
-                "Insert a prompt...", label_visibility="collapsed", key="search_input"
-            )
-
-        with col_btn:
-            run_search = st.button("➤", type="primary", help="Run Suggestion")
 
     # execution logic for Recommendation Page
     if run_search:
