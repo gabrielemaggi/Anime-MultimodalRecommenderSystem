@@ -4,6 +4,7 @@ import numpy as np
 from node2vec import Node2Vec
 from gensim.models import Word2Vec
 from indexing_db import *
+from User import *
 
 def get_anime_vector(model, genres, studio=None, title=None):
     """
@@ -48,11 +49,20 @@ if __name__ == "__main__":
     indexer.build_vector_database()
 
     results = indexer.encode_tabular_genre_studio(genres=['Drama', 'Romance'], studios=['MAPPA'])
-    print(results)
+    # print(results)
 
     embedding = results.get('genres').get('Romance')
-    print("aaaaa", embedding)
+    # print("aaaaa", embedding)
     query = indexer.align_embedding(embedding, modality='tab')
 
-    similars = indexer.search(query)
-    print(similars)
+    indexer.load_vector_database()
+    u = User("MrPeanut02")
+    u.debug_plot_watchlist()
+    u.findCentersOfClusters()
+    u.add_filtering(query, "move")
+
+    print("---"*40)
+    print(u.get_nearest_anime_from_clusters(indexer, 10))
+
+    # similars = indexer.search(query)
+    # print(similars)

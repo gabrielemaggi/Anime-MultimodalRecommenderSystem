@@ -35,6 +35,8 @@ def get_anime_lookup():
     Chiave: ID Anime -> Valore: {Dati Anime}
     """
     df = pd.read_csv("dataset/AnimeList.csv")
+
+
     # Crea un dizionario indicizzato per ID per accesso istantaneo
     # Orient='index' crea un dict tipo: {123: {'title_english': '...', ...}, 456: {...}}
     return df.set_index('id').to_dict(orient='index') # Osa 'id' o 'MAL_ID' in base al tuo CSV

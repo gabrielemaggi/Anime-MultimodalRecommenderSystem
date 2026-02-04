@@ -4,7 +4,8 @@ from indexing_db import *
 from mal import client
 from sympy.codegen.ast import Raise
 from UserDBConnector import UserDBConnector
-
+import textwrap
+import matplotlib.pyplot as plt
 
 class User:
     # get a user from the db
@@ -26,7 +27,7 @@ class User:
             watch_list = api.get_anime_list(username=id, limit=100, include_nsfw=True)
             self.id = id
 
-            df_anime = pd.read_csv("./AnimeList.csv")
+            df_anime = pd.read_csv("./dataset/AnimeList.csv")
 
             watched = []
             for anime in watch_list:
@@ -74,56 +75,62 @@ class User:
         self.embeddings = kmean.get_centers()
         return self.embeddings
 
-    def get_nearest_anime_from_clusters(self, vector_db, top_k: int = 10):
+    def get_nearest_anime_from_clusters(self, vector_db, top_k: int = 20):
         """
-        Find nearest anime to each cluster center and return their IDs
+        Find nearest anime across all cluster centers and return a total of top_k unique, unwatched IDs
         """
         if not hasattr(self, "embeddings"):
             self.findCentersOfClusters()
 
         all_anime_entries = []
 
-        # 1. Gather all recommendations
+        n_cluster = len(self.embeddings)
+
+        if top_k < n_cluster:
+            k = n_cluster
+        else:
+            k = int(top_k / n_cluster) * 3
+
+        # 1. Gather candidates
         for center_embedding in self.embeddings:
             nearest_entries = vector_db.search(
-                query_embedding=center_embedding, top_k=top_k
+                query_embedding=center_embedding, top_k=k
             )
             all_anime_entries.extend(nearest_entries)
 
         # 2. PRE-PROCESS WATCHED IDS
-        # Convert self.watched [[id, score], ...] into a set of IDs for fast O(1) lookup.
-        # We cast to str() to ensure '123' (string) matches 123 (int) to avoid type mismatches.
         watched_ids = {str(item[0]) for item in self.watched}
 
         # 3. Filter duplicates and watched items
         seen_ids = set()
         unique_anime_entries = []
+
         for anime_data in all_anime_entries:
-            # Extract the ID from the dictionary (vector DB result)
-            # Ensure we use the correct key, e.g., 'id' or 'anime_id'
             current_id = str(anime_data.get("id"))
 
-            # Check if we have seen this ID in this loop OR if the user watched it
             if current_id not in seen_ids and current_id not in watched_ids:
                 seen_ids.add(current_id)
                 unique_anime_entries.append(anime_data)
 
-        # Sort by similarity and slice to respect the actual top_k requested
+        # 4. Global Sort & Final Slice
+        # Sort the combined pool by similarity score
         unique_anime_entries.sort(key=lambda x: x.get("similarity", 0), reverse=True)
-        return unique_anime_entries
+
+        # Return exactly the total amount requested (or fewer if not enough found)
+        return unique_anime_entries[:top_k]
+
 
     def debug_plot_watchlist(self):
         """
         Debug method: Load AnimeList.csv and plot titles and synopsis of watched anime
         self.watched format: [[anime_id, score], [anime_id, score], ...]
         """
-        import textwrap
 
-        import matplotlib.pyplot as plt
 
         try:
+
             # Load the anime database
-            anime_df = pd.read_csv("AnimeList.csv")
+            anime_df = pd.read_csv("./dataset/AnimeList.csv")
 
             # Extract just the anime IDs from self.watched
             watched_ids = [anime[0] for anime in self.watched]
@@ -174,8 +181,54 @@ class User:
             traceback.print_exc()
 
     def add_anime(self, anime_id, rating):
-        print(self.watched)
+        # print(self.watched)
         self.watched.append([int(anime_id), int(rating)])
+
+    def add_filtering(self, query_vector, mode='append', magnitude=1.0):
+        """
+        Add filtering to user's cluster centroids.
+        Parameters:
+        -----------
+        query_vector : numpy array or list
+            The query vector to use for filtering
+        mode : str, default='append'
+            - 'append': Add the query vector as a new centroid
+            - 'move': Move existing centroids toward the query vector
+        Returns:
+        --------
+        numpy array : Updated embeddings
+        """
+        if self.embeddings is None:
+            raise ValueError("No embeddings found. Run findCentersOfClusters() first.")
+        query_vector = np.array(query_vector)
+        if mode == 'append':
+            # Original behavior: append the query as a new centroid
+            self.embeddings = np.append(self.embeddings, [query_vector], axis=0)
+
+        elif mode == 'move':
+            # New behavior: move centroids toward the query vector
+            # Calculate distances from each centroid to the query
+            distances = np.linalg.norm(self.embeddings - query_vector, axis=1)
+            # Find the maximum distance (most distant centroid)
+            max_distance = np.max(distances)
+            # Heuristic: move each centroid toward query by a fraction of max_distance
+            # This ensures we don't move too much relative to the spread of centroids
+            # The farther a centroid is from the query, the less we move it (proportionally)
+            alpha = magnitude  # Tunable parameter: how much to move (0 = no move, 1 = full move to query)
+            moved_embeddings = []
+            for i, centroid in enumerate(self.embeddings):
+                # Calculate the direction vector from centroid to query
+                direction = query_vector - centroid
+                # Scale movement inversely with distance to preserve cluster structure
+                # Closer centroids move more, distant ones move less
+                movement_scale = alpha * (1 - distances[i] / max_distance) if max_distance > 0 else 0
+                # Move the centroid
+                new_centroid = centroid + movement_scale * direction
+                moved_embeddings.append(new_centroid)
+            self.embeddings = np.array(moved_embeddings)
+        else:
+            raise ValueError(f"Unknown mode: {mode}. Use 'append' or 'move'.")
+        return self.embeddings
 
 
 if __name__ == "__main__":
@@ -187,4 +240,4 @@ if __name__ == "__main__":
     u.debug_plot_watchlist()
 
     u.findCentersOfClusters()
-    print(u.get_nearest_anime_from_clusters(index, 10))
+    # print(u.get_nearest_anime_from_clusters(index, 100))
