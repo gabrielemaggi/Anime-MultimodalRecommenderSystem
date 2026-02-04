@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="anime_recommender_project",
     version="0.1.0",
-    author="Omer , Nicolo, Allesandro e Gabriele",
+    author="Omer , Nicolo, Alesandro e Gabriele",
     description="A multimodal recommendation system for Anime",
 
     packages=find_packages(),

@@ -39,7 +39,6 @@ def log_embeddings_info(embeddings, sample_key=None, top_n=5):
 
 
 if __name__ == "__main__":
-
     indexer = Indexing()
     indexer.build_vector_database()
     results = indexer.search_by_id(26055, top_k=5)

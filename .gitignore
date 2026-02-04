@@ -2,6 +2,7 @@
 __pycache__/
 *.py[codz]
 *$py.class
+.zed/
 
 dataset/
 Var/
@@ -220,3 +221,4 @@ libs/
 /Resources/UserAnimeList.csv
 /Resources/UserAnimeList.parquet
 /Resources/UserList.csv
+.DS_Store
