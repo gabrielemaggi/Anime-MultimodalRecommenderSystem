@@ -4,7 +4,8 @@ from indexing_db import *
 from mal import client
 from sympy.codegen.ast import Raise
 from UserDBConnector import UserDBConnector
-
+import textwrap
+import matplotlib.pyplot as plt
 
 class User:
     # get a user from the db
@@ -117,9 +118,7 @@ class User:
         Debug method: Load AnimeList.csv and plot titles and synopsis of watched anime
         self.watched format: [[anime_id, score], [anime_id, score], ...]
         """
-        import textwrap
 
-        import matplotlib.pyplot as plt
 
         try:
 

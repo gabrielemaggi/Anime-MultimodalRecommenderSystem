@@ -54,5 +54,11 @@ if __name__ == "__main__":
     print("aaaaa", embedding)
     query = indexer.align_embedding(embedding, modality='tab')
 
+    index.load_vector_database()
+    u = User("MrPeanut02")
+    u.debug_plot_watchlist()
+    u.findCentersOfClusters()
+    print(u.get_nearest_anime_from_clusters(index, 10))
+
     similars = indexer.search(query)
     print(similars)
