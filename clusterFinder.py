@@ -30,8 +30,12 @@ class clusterFinder:
             self.K = int(sqrt(self.num_of_anime / 2 ))
 
     def get_centers(self):
-        kmeans = KMeans(n_clusters=self.K, random_state=42, n_init=10)
+        kmeans = KMeans(n_clusters=self.K, random_state=42)
 
+        # Fixed the score that 0 is neutral!
+        self.scores = [5 if x == 0 else x for x in self.scores]
+
+        print(self.scores)
         # run with weights
         kmeans.fit(self.vectors, sample_weight=self.scores)
 

@@ -26,7 +26,7 @@ class User:
             watch_list = api.get_anime_list(username=id, limit=100, include_nsfw=True)
             self.id = id
 
-            df_anime = pd.read_csv("./AnimeList.csv")
+            df_anime = pd.read_csv("./dataset/AnimeList.csv")
 
             watched = []
             for anime in watch_list:
@@ -122,8 +122,9 @@ class User:
         import matplotlib.pyplot as plt
 
         try:
+
             # Load the anime database
-            anime_df = pd.read_csv("AnimeList.csv")
+            anime_df = pd.read_csv("./dataset/AnimeList.csv")
 
             # Extract just the anime IDs from self.watched
             watched_ids = [anime[0] for anime in self.watched]
