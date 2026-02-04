@@ -14,7 +14,8 @@ class TabularEncoder():
         # Internal state
         self.df = None
         self.G = None
-        self.model_path = "./Embeddings/anime_node2vec_weighted.model"
+        self.model_path = "./Embeddings/anime_tabular_model.model"
+        self.vectors_path = "./Embeddings/anime_tabular_embedding.vec"
         self.model = None
         # self.embeddings_loaded = False
 
@@ -22,8 +23,8 @@ class TabularEncoder():
         self.__load(cvs_path)
         self.__build_graph()
         self.__train_model()
+        self.save_model("Embeddings/anime_tabular_model.model", "Embeddings/anime_tabular_embedding.vec")
         return self.return_embeddings()
-        #self.save_model("Embeddings/anime_tabular_model.model", "Embeddings/anime_tabular_embedding.vec")
 
     def __load(self, filepath):
         """Loads and cleans the DataFrame."""
@@ -87,8 +88,8 @@ class TabularEncoder():
         node2vec = Node2Vec(
             self.G,
             dimensions=self.embedding_dim,
-            walk_length=3,  # 30
-            num_walks=5,   # 100 production
+            walk_length=30,  # 30
+            num_walks=100,   # 100 production
             workers=12,
             weight_key='weight',
             temp_folder='./Embeddings/'
@@ -107,8 +108,8 @@ class TabularEncoder():
         self.model.save(model_path)
 
         # 2. Save KeyedVectors format (.vec)
-        print(f"Saving text vectors to {vectors_path}...")
-        self.model.wv.save_word2vec_format(vectors_path)
+        print(f"Saving text vectors to {vector_path}...")
+        self.model.wv.save_word2vec_format(vector_path)
 
     # copia in indexing
     def load_embeddings(self):
