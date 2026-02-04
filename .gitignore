@@ -220,3 +220,4 @@ libs/
 /Resources/UserAnimeList.csv
 /Resources/UserAnimeList.parquet
 /Resources/UserList.csv
+.DS_Store
