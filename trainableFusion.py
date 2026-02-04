@@ -6,64 +6,89 @@ from torch.utils.data import Dataset, DataLoader
 import os
 import copy
 
-class SimpleFusion(nn.Module):
-    """Minimal trainable fusion with InfoNCE loss"""
-    def __init__(self, syn_dim: int, vis_dim: int, tab_dim: int, output_dim: int = 256):
-        super().__init__()
-        self.output_dim = output_dim
-        self.proj = nn.Linear(syn_dim + vis_dim + tab_dim, self.output_dim)
-
-    def forward(self, syn, vis, tab):
-        # 1. L2-normalize each modality (critical!)
-        syn = F.normalize(syn, p=2, dim=-1)
-        vis = F.normalize(vis, p=2, dim=-1)
-        tab = F.normalize(tab, p=2, dim=-1)
-        # 2. Concatenate and project
-        x = torch.cat([syn, vis, tab], dim=-1)
-        x = self.proj(x)
-        # 3. L2-normalize final embedding (for cosine similarity)
-        return F.normalize(x, p=2, dim=-1)
-
 
 class CoMMFusion(nn.Module):
-    def __init__(self, syn_dim, vis_dim, tab_dim, output_dim=256):
+    def __init__(self, syn_dim, vis_dim, tab_dim, output_dim=128):
         super().__init__()
-        # Independent encoders to map different input sizes to the same shared space
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # --- Encoders ---
         self.enc_syn = nn.Sequential(nn.Linear(syn_dim, output_dim), nn.ReLU(), nn.Linear(output_dim, output_dim))
         self.enc_vis = nn.Sequential(nn.Linear(vis_dim, output_dim), nn.ReLU(), nn.Linear(output_dim, output_dim))
         self.enc_tab = nn.Sequential(nn.Linear(tab_dim, output_dim), nn.ReLU(), nn.Linear(output_dim, output_dim))
-
+        # --- Learnable Modality Importance Weights ---
+        # We initialize these to 0.0 so that exp(0) = 1.0
+        # This means all modalities start as equally important.
+        self.weight_syn = nn.Parameter(torch.zeros([]))
+        self.weight_vis = nn.Parameter(torch.zeros([]))
+        self.weight_tab = nn.Parameter(torch.zeros([]))
+        # --- Learnable Logit Scale (Temperature) ---
+        # We initialize to log(1/0.07) approx 2.65
+        # This acts as the inverse temperature for the Loss function.
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
         self.output_dim = output_dim
 
     def forward(self, syn, vis, tab, return_centroid=False):
-
-        # Project and normalize
+        # 1. Project and normalize individual embeddings
         z_s = F.normalize(self.enc_syn(syn), p=2, dim=-1)
         z_v = F.normalize(self.enc_vis(vis), p=2, dim=-1)
         z_t = F.normalize(self.enc_tab(tab), p=2, dim=-1)
 
-        # The "Centroid" is the CoMM representation
-        centroid = (z_s + z_v + z_t) # / 3
-        centroid = F.normalize(centroid, p=2, dim=-1)
+        # 2. Calculate Importance Weights
+        # exp() ensures weights are always positive
+        w_s = torch.exp(self.weight_syn)
+        w_v = torch.exp(self.weight_vis)
+        w_t = torch.exp(self.weight_tab)
+
+        # 3. Create Weighted Centroid
+        # If the model learns that 'vis' is noisy, w_v will decrease.
+        weighted_sum = (w_s * z_s) + (w_v * z_v) + (w_t * z_t)
+
+        # 4. Normalize the Centroid
+        centroid = F.normalize(weighted_sum, p=2, dim=-1)
 
         if return_centroid:
             return z_s, z_v, z_t, centroid
+
         return centroid
+
+    def comm_loss(self, z_s, z_v, z_t, centroid):
+        """
+        CoMM Alignment Loss using Learnable Temperature.
+        """
+        batch_size = z_s.size(0)
+        labels = torch.arange(batch_size, device=z_s.device)
+
+        # 1. Recover the dynamic temperature
+        # exp(logit_scale) is equivalent to (1 / temperature)
+        # We clamp it to max 100 to prevent numerical instability (standard in CLIP)
+        logit_scale = self.logit_scale.exp().clamp(max=100)
+
+        # 2. Calculate Similarities scaled by temperature
+        # Math: similarity * (1/0.07)
+        logits_s = torch.matmul(z_s, centroid.T) * logit_scale
+        logits_v = torch.matmul(z_v, centroid.T) * logit_scale
+        logits_t = torch.matmul(z_t, centroid.T) * logit_scale
+
+        # 3. Multi-modal Cross Entropy
+        loss_s = F.cross_entropy(logits_s, labels)
+        loss_v = F.cross_entropy(logits_v, labels)
+        loss_t = F.cross_entropy(logits_t, labels)
+
+        return (loss_s + loss_v + loss_t) / 3
 
 
 
 class FusionTrainer:
-    def __init__(self, item_ids, syn_embs, vis_embs, tab_embs, output_dim=256, load_model=False):
+    def __init__(self, item_ids, syn_embs, vis_embs, tab_embs, output_dim=384, load_model=False):
         self.syn_embs = syn_embs.astype('float32')
         self.vis_embs = vis_embs.astype('float32')
         self.tab_embs = tab_embs.astype('float32')
 
         self.item_ids = item_ids
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.save_path = "my_fusion_v1.pt"
+        self.save_path = "./Embeddings/fusion_model.pt"
 
-        self.model = CoMMFusion(384, 384, 384, 384)
+        self.model = CoMMFusion(384, 384, 384, output_dim)
 
         if load_model:
              self.model = self.load(self.save_path, self.device)
@@ -75,26 +100,7 @@ class FusionTrainer:
                 output_dim
             ).to(self.device)
 
-    def comm_loss(self, z_s, z_v, z_t, centroid, temperature=0.07):
-        """
-        CoMM Alignment: Each modality is pulled towards the shared centroid.
-        """
-        batch_size = z_s.size(0)
-        labels = torch.arange(batch_size, device=self.device)
 
-        # 1. Similarity of each modality to the shared Centroid
-        # We use the logit_scale (temperature) to sharpen the distribution
-        logits_s = torch.matmul(z_s, centroid.T) / temperature
-        logits_v = torch.matmul(z_v, centroid.T) / temperature
-        logits_t = torch.matmul(z_t, centroid.T) / temperature
-
-        # 2. Multi-modal Cross Entropy
-        # This enforces that syn[i] identifies centroid[i], vis[i] identifies centroid[i], etc.
-        loss_s = F.cross_entropy(logits_s, labels)
-        loss_v = F.cross_entropy(logits_v, labels)
-        loss_t = F.cross_entropy(logits_t, labels)
-
-        return (loss_s + loss_v + loss_t) / 3
 
     def train_2(self, epochs=50, batch_size=128):
         if os.path.exists(self.save_path):
@@ -115,7 +121,7 @@ class FusionTrainer:
                 z_s, z_v, z_t, centroid = self.model(syn, vis, tab, return_centroid=True)
 
                 # Calculate CoMM loss
-                loss = self.comm_loss(z_s, z_v, z_t, centroid)
+                loss = self.model.comm_loss(z_s, z_v, z_t, centroid)
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -126,7 +132,7 @@ class FusionTrainer:
 
         self.save(self.save_path)
 
-    def train(self, epochs=500, batch_size=512, patience=5, min_delta=1e-4):
+    def train(self, epochs=500, batch_size=2048, patience=15, min_delta=1e-4):
         if os.path.exists(self.save_path):
             self.load(self.save_path)
             return self.model
@@ -151,7 +157,7 @@ class FusionTrainer:
                 syn, vis, tab = syn.to(self.device), vis.to(self.device), tab.to(self.device)
 
                 z_s, z_v, z_t, centroid = self.model(syn, vis, tab, return_centroid=True)
-                loss = self.comm_loss(z_s, z_v, z_t, centroid)
+                loss = self.model.comm_loss(z_s, z_v, z_t, centroid)
 
                 optimizer.zero_grad()
                 loss.backward()
