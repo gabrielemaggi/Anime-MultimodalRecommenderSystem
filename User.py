@@ -206,7 +206,7 @@ class User:
             # Heuristic: move each centroid toward query by a fraction of max_distance
             # This ensures we don't move too much relative to the spread of centroids
             # The farther a centroid is from the query, the less we move it (proportionally)
-            alpha = 0.2  # Tunable parameter: how much to move (0 = no move, 1 = full move to query)
+            alpha = 0.1  # Tunable parameter: how much to move (0 = no move, 1 = full move to query)
             moved_embeddings = []
             for i, centroid in enumerate(self.embeddings):
                 # Calculate the direction vector from centroid to query
