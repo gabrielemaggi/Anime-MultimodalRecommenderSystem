@@ -79,6 +79,8 @@ if "results" not in st.session_state:
     st.session_state.results = []
 if "logged_in_user" not in st.session_state:
     st.session_state.logged_in_user = None
+if "user_object" not in st.session_state:
+    st.session_state.user_object = None
 if "selected_genres" not in st.session_state:
     st.session_state.selected_genres = []
 if "selected_studios" not in st.session_state:
@@ -130,9 +132,17 @@ def apply_filtering(
     return False
 
 
-# ---------------------------------------------------------------------------
-# Sidebar Logic
-# ---------------------------------------------------------------------------
+def get_user_object():
+    """Helper function to get or create the user object from session state"""
+    if st.session_state.user_object is None:
+        u_name = st.session_state.logged_in_user
+        if u_name:
+            st.session_state.user_object = User(
+                int(u_name) if u_name.isdigit() else u_name
+            )
+    return st.session_state.user_object
+
+
 # ---------------------------------------------------------------------------
 # Sidebar Logic
 # ---------------------------------------------------------------------------
@@ -150,8 +160,10 @@ with st.sidebar:
             if user_input:
                 st.session_state.logged_in_user = user_input
                 with st.spinner("🔄 Loading..."):
+                    # Create and save user object in session state
                     user = User(int(user_input) if user_input.isdigit() else user_input)
                     user.findCentersOfClusters()
+                    st.session_state.user_object = user
                     st.session_state.results = user.get_nearest_anime_from_clusters(
                         index, 12
                     )
@@ -196,14 +208,14 @@ with st.sidebar:
                 "Results limit",
                 min_value=1,
                 max_value=100,
-                value=st.session_state.top_k_val,  # Set current state as default
-                key="top_k_input",  # Use a unique key for the widget
+                value=st.session_state.top_k_val,
+                key="top_k_input",
             )
 
             if st.button("🚀 Update Results", type="primary", use_container_width=True):
                 with st.spinner("🔄 Refreshing..."):
-                    u_name = st.session_state.logged_in_user
-                    user = User(int(u_name) if u_name.isdigit() else u_name)
+                    # Use the saved user object
+                    user = get_user_object()
                     user.findCentersOfClusters()
                     apply_filtering(
                         user,
@@ -230,6 +242,7 @@ with st.sidebar:
         st.markdown("<br>" * 2, unsafe_allow_html=True)
         if st.button("🚪 Change User", use_container_width=True):
             st.session_state.logged_in_user = None
+            st.session_state.user_object = None
             st.session_state.results = []
             st.rerun()
 
@@ -282,12 +295,8 @@ if st.session_state.logged_in_user is not None:
                                         with st.spinner(
                                             "🔄 Updating your profile and recommendations..."
                                         ):
-                                            # 1. Initialize and save rating
-                                            u = User(
-                                                int(u_name)
-                                                if u_name.isdigit()
-                                                else u_name
-                                            )
+                                            # 1. Use the saved user object and save rating
+                                            u = get_user_object()
                                             u.add_anime(anime_id, rating)
 
                                             # 2. Re-calculate user clusters based on the new rating
@@ -319,7 +328,8 @@ if st.session_state.logged_in_user is not None:
 
     elif page_selection == "User History":
         st.title("📚 Your Watch History")
-        user = User(int(u_name) if u_name.isdigit() else u_name)
+        # Use the saved user object
+        user = get_user_object()
         raw_watchlist = user.get_watchList()
 
         if not raw_watchlist:

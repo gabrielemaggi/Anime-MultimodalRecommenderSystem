@@ -46,69 +46,66 @@ class User:
 
                 if not match.empty:
                     watched.append([id_mal, score])
-                else:
-                    print(f"Adding new anime to system: {title_mal}")
+               # else:
+               #     print(f"Adding new anime to system: {title_mal}")
 
-                    # 2. Call API for full details (Synopsis, Genres, etc.)
-                    try:
-                        # ... inside your loop ...
+               #     # 2. Call API for full details (Synopsis, Genres, etc.)
+               #     try:
 
-                        image_dir = "./dataset/images/"
-                        os.makedirs(image_dir, exist_ok=True)
+               #         image_dir = "./dataset/images/"
+               #         os.makedirs(image_dir, exist_ok=True)
 
-                        # ... inside your loop ...
+               #         fields = [
+               #             "synopsis",
+               #             "genres",
+               #             "num_episodes",
+               #             "mean",
+               #             "alternative_titles",
+               #             "main_picture",  # The API field name
+               #         ]
 
-                        fields = [
-                            "synopsis",
-                            "genres",
-                            "num_episodes",
-                            "mean",
-                            "alternative_titles",
-                            "main_picture",  # The API field name
-                        ]
+               #         # Fetch from API
+               #         full_info = api.get_anime(id_mal, fields=fields)
 
-                        # Fetch from API
-                        full_info = api.get_anime(id_mal, fields=fields)
+               #         # 1. DOWNLOAD IMAGE (using the correct documentation attribute)
+               #         # Documentation states 'main_picture_url' is the standard attribute for this library.
+               #         image_url = full_info.main_picture_url
+               #         image_path = os.path.join(image_dir, f"{id_mal}.jpg")
 
-                        # 1. DOWNLOAD IMAGE (using the correct documentation attribute)
-                        # Documentation states 'main_picture_url' is the standard attribute for this library.
-                        image_url = full_info.main_picture_url
-                        image_path = os.path.join(image_dir, f"{id_mal}.jpg")
+               #         if image_url and not os.path.exists(image_path):
+               #             try:
+               #                 response = requests.get(image_url, timeout=10)
+               #                 if response.status_code == 200:
+               #                     with open(image_path, "wb") as f:
+               #                         f.write(response.content)
+               #                     print(f"Successfully downloaded: {image_path}")
+               #             except Exception as e:
+               #                 print(f"Error downloading image for ID {id_mal}: {e}")
 
-                        if image_url and not os.path.exists(image_path):
-                            try:
-                                response = requests.get(image_url, timeout=10)
-                                if response.status_code == 200:
-                                    with open(image_path, "wb") as f:
-                                        f.write(response.content)
-                                    print(f"Successfully downloaded: {image_path}")
-                            except Exception as e:
-                                print(f"Error downloading image for ID {id_mal}: {e}")
+               #         # 2. MAP TO YOUR DATA DICTIONARY
+               #         data = {
+               #             "id": id_mal,
+               #             "title": full_info.title,
+               #             "genre": ", ".join([g.name for g in full_info.genres]),
+               #             "synopsis": full_info.synopsis,
+               #             "episodes": full_info.num_episodes,
+               #             "rating": full_info.mean,
+               #         }
 
-                        # 2. MAP TO YOUR DATA DICTIONARY
-                        data = {
-                            "id": id_mal,
-                            "title": full_info.title,
-                            "genre": ", ".join([g.name for g in full_info.genres]),
-                            "synopsis": full_info.synopsis,
-                            "episodes": full_info.num_episodes,
-                            "rating": full_info.mean,
-                        }
+               #         # TODO: call your vector_db add vector here using 'data'
+               #         # Initialize your indexer
+               #         indexer = Indexing()
+               #         indexer.load_vector_database()
 
-                        # TODO: call your vector_db add vector here using 'data'
-                        # Initialize your indexer
-                        indexer = Indexing()
-                        indexer.load_vector_database()
+               #         # Add it to the DB (it will encode synopsis, tabular, and look for the image)
+               #         indexer.add_new_anime_to_db(
+               #             data, image_path=f"./dataset/images/{id_mal}.jpg"
+               #         )
 
-                        # Add it to the DB (it will encode synopsis, tabular, and look for the image)
-                        indexer.add_new_anime_to_db(
-                            data, image_path=f"./dataset/images/{id_mal}.jpg"
-                        )
+               #         print(data)
 
-                        print(data)
-
-                    except Exception as e:
-                        print(f"Error fetching details for {title_mal}: {e}")
+               #     except Exception as e:
+               #         print(f"Error fetching details for {title_mal}: {e}")
 
             self.watched = watched
             self.watch_anime_info = watched
