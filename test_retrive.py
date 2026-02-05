@@ -1,5 +1,5 @@
-from indexing_db import *
-from Fusion import *
+from Libs.indexing_db import *
+from Libs.Fusion import *
 import numpy as np
 
 def log_embeddings_info(embeddings, sample_key=None, top_n=5):

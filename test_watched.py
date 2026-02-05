@@ -1,6 +1,6 @@
 import pandas as pd
-from indexing_db import Indexing
-from User import *
+from Libs.indexing_db import Indexing
+from Libs.User import *
 
 
 def test_user_sync(username):

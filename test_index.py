@@ -1,4 +1,4 @@
-from indexing_db import *
+from Libs.indexing_db import *
 import numpy as np
 
 def log_embeddings_info(embeddings, sample_key=None, top_n=5):

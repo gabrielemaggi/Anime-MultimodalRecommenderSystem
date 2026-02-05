@@ -3,8 +3,8 @@ import networkx as nx
 import numpy as np
 from node2vec import Node2Vec
 from gensim.models import Word2Vec
-from indexing_db import *
-from User import *
+from Libs.indexing_db import *
+from Libs.User import *
 
 def get_anime_vector(model, genres, studio=None, title=None):
     """
