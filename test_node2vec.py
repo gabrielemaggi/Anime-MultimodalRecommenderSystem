@@ -46,7 +46,7 @@ def get_anime_vector(model, genres, studio=None, title=None):
 # ---------------------------------------------------------
 # 7. USAGE EXAMPLE
 # ---------------------------------------------------------
-model = Word2Vec.load("anime_node2vec_weighted.model")
+model = Word2Vec.load("./Embeddings/anime_node2vec_weighted.model")
 
 # Let's search for a mix: "Action" + "Fantasy" made by "Kyoto Animation"
 search_genres = ["Romance", "Fantasy", "Action"]

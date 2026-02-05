@@ -6,7 +6,7 @@ import traceback
 from tqdm import tqdm
 from contextlib import contextmanager
 from collections import Counter
-from User import *
+from Libs.User import *
 
 class RecommenderEvaluator:
     """
@@ -114,7 +114,7 @@ class RecommenderEvaluator:
 
 
 # Constants
-OUTPUT_FILE = "recs_output.jsonl"
+OUTPUT_FILE = "./Embeddings/recs_output.jsonl"
 ERROR_LOG = "processing_errors.log"
 CHUNK_SIZE = 5000  # Smaller chunks for safety
 GC_FREQUENCY = 20  # Garbage collect every N users
@@ -243,7 +243,7 @@ def generate_recommendations_safe():
     # get user list
     print("\n[3/5] user list extraction...")
     try:
-        unique_users = get_unique_users_list("./Resources/UserAnimeList.parquet")
+        unique_users = get_unique_users_list("./Dataset/UserAnimeList.parquet")
         print(f"       found {len(unique_users)} users")
 
         # filter already processed
@@ -280,7 +280,7 @@ def generate_recommendations_safe():
             try:
                 with memory_cleanup():
                     df_chunk = pd.read_parquet(
-                        "./Resources/UserAnimeList.parquet",
+                        "./Dataset/UserAnimeList.parquet",
                         filters=[('user_id', 'in', user_chunk)]
                     )
 
@@ -353,7 +353,7 @@ def generate_recommendations_safe():
     print("=" * 60)
 
 
-def evaluate_from_file(recs_file="recs_output.jsonl"):
+def evaluate_from_file(recs_file="./Embeddings/recs_output.jsonl"):
     """Evaluate generated recommendations"""
 
     print("\n" + "=" * 60)
@@ -362,11 +362,11 @@ def evaluate_from_file(recs_file="recs_output.jsonl"):
 
     print("\n[1/3] loading the dataset...")
     try:
-        df_interactions = pd.read_parquet("./Resources/UserAnimeList.parquet")
+        df_interactions = pd.read_parquet("./Dataset/UserAnimeList.parquet")
         if 'anime_id' in df_interactions.columns:
             df_interactions = df_interactions.rename(columns={'anime_id': 'anime_id'})
 
-        df_catalog = pd.read_csv("./AnimeList.csv")
+        df_catalog = pd.read_csv("./Dataset/AnimeList.csv")
         full_catalog_ids = df_catalog['id'].unique()
         print("       dataset loaded")
 
@@ -410,7 +410,7 @@ def evaluate_from_file(recs_file="recs_output.jsonl"):
 
 if __name__ == "__main__":
     try:
-        generate_recommendations_safe()
+        # generate_recommendations_safe()
 
         # Uncomment to run evaluation after generation
         # print("\n")

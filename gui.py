@@ -34,7 +34,7 @@ def get_anime_lookup():
     Crea un dizionario veloce per cercare i titoli.
     Chiave: ID Anime -> Valore: {Dati Anime}
     """
-    df = pd.read_csv("dataset/AnimeList.csv")
+    df = pd.read_csv("./dataset/AnimeList.csv")
 
 
     # Crea un dizionario indicizzato per ID per accesso istantaneo
