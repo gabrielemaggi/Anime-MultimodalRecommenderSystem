@@ -11,10 +11,10 @@ class UserDBCleaner:
             return
 
         self.user_list_path = "Var/UserList.csv"
-        self.user_AnimeList_path = "Var/UserAnimeList.csv"
+        self.user_AnimeList_path = "./Dataset/UserAnimeList.csv"
 
-        self.user_list_parquet = "Resources/UserList.parquet"
-        self.user_anime_parquet = "Resources/UserAnimeList.parquet"
+        self.user_list_parquet = "./Dataset/UserList.parquet"
+        self.user_anime_parquet = "./Dataset/UserAnimeList.parquet"
 
         print("Initializing Singleton: Loading databases into memory...")
         self._load_initial_data()

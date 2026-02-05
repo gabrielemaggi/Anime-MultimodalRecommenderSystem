@@ -414,7 +414,7 @@ if __name__ == "__main__":
 
         # Uncomment to run evaluation after generation
         # print("\n")
-        #evaluate_from_file()
+        evaluate_from_file()
 
     except KeyboardInterrupt:
         print("\n\n keyboard interrupt - progress saved")

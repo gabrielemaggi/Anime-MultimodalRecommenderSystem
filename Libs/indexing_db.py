@@ -21,14 +21,14 @@ class Indexing:
         self.tabular_encoder = None
 
         # Paths
-        self.synopsis_path = "../Embeddings/anime_syno_embeddings.json"
-        self.visual_path = "../Embeddings/anime_poster_embeddings.json"
-        self.tabular_path = "../Embeddings/anime_tabular_embeddings.json"
+        self.synopsis_path = "./Embeddings/anime_syno_embeddings.json"
+        self.visual_path = "./Embeddings/anime_poster_embeddings.json"
+        self.tabular_path = "./Embeddings/anime_tabular_embeddings.json"
 
-        self.image_dir = Path("../Dataset/images/")
-        self.dataset = Path("../Dataset/AnimeList.csv")
-        self.anime_db_index = "../Embeddings/AnimeVecDb.index"
-        self.anime_db_metadata = "../Embeddings/AnimeVecDb.pkl"
+        self.image_dir = Path("./Dataset/images/")
+        self.dataset = Path("./Dataset/AnimeList.csv")
+        self.anime_db_index = "./Embeddings/AnimeVecDb.index"
+        self.anime_db_metadata = "./Embeddings/AnimeVecDb.pkl"
 
         # Metadata columns to store
         self.AM = ["title", "title_english", "title_japanese", "genre", "sypnopsis"]
@@ -377,10 +377,11 @@ class Indexing:
         if (
             not Path(self.anime_db_index).exists()
             or not Path(self.anime_db_metadata).exists()
-        ):
-            raise FileNotFoundError(
-                "Vector database files not found. Build database first."
-            )
+        ):  
+            self.build_vector_database()
+            # raise FileNotFoundError(
+            #     "Vector database files not found. Build database first."
+            # )
 
         # Load metadata to get dimension
         with open(self.anime_db_metadata, "rb") as f:

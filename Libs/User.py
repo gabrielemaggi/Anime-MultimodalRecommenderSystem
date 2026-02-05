@@ -45,7 +45,7 @@ class User:
             watch_list = api.get_anime_list(username=id, limit=100, include_nsfw=True)
             self.id = id
 
-            df_anime = pd.read_csv("./AnimeList.csv")
+            df_anime = pd.read_csv("./Dataset/AnimeList.csv")
 
             watched = []
             for anime in watch_list:
@@ -93,7 +93,7 @@ class User:
         self.embeddings = kmean.get_centers()
         return self.embeddings
 
-    def get_nearest_anime_from_clusters(self, vector_db, top_k: int = 10):
+    def get_nearest_anime_from_clusters(self, index, top_k: int = 10):
         """
         Find nearest anime to each cluster center and return their IDs
         """
@@ -104,7 +104,7 @@ class User:
 
         # 1. Gather all recommendations
         for center_embedding in self.embeddings:
-            nearest_entries = vector_db.search(
+            nearest_entries = index.search(
                 query_embedding=center_embedding, top_k=top_k
             )
             all_anime_entries.extend(nearest_entries)

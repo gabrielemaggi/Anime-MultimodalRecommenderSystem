@@ -44,7 +44,7 @@ if __name__ == "__main__":
     indexer.load_vector_database()
 
 
-    image_path = "./dataset/images/26055.jpg"
+    image_path = "./Dataset/images/26055.jpg"
     syn = "Joutarou Kuujou and his allies have finally made it to Egypt, where the immortal Dio awaits. Upon their arrival, the group gains a new comrade: Iggy, a mutt who wields the Stand \"The Fool.\" It's not all good news however, as standing in their path is a new group of Stand users who serve Dio, each with a Stand representative of an ancient Egyptian god. As their final battle approaches, it is a race against time to break Joutarou's mother free from her curse and end Dio's reign of terror over the Joestar family once and for all."
     id = 11123
     title = "JoJo no Kimyou na Bouken: Stardust Crusaders 2nd Season"
