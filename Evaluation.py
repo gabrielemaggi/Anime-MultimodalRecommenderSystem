@@ -1,12 +1,15 @@
-import pandas as pd
+import gc
 import json
 import os
-import gc
 import traceback
-from tqdm import tqdm
-from contextlib import contextmanager
 from collections import Counter
+from contextlib import contextmanager
+
+import pandas as pd
+from tqdm import tqdm
+
 from Libs.User import *
+
 
 class RecommenderEvaluator:
     """
@@ -28,7 +31,7 @@ class RecommenderEvaluator:
         # pre-calculate item popularity for Novelty metric (Self-Information)
         # p(i) = frequency of item i in the training set
         total_interactions = len(train_df)
-        item_counts = train_df['anime_id'].value_counts()
+        item_counts = train_df["anime_id"].value_counts()
 
         # store as dictionary
         self.item_popularity = (item_counts / total_interactions).to_dict()
@@ -54,7 +57,7 @@ class RecommenderEvaluator:
             "catalog_coverage": self._calculate_catalog_coverage(unique_recs),
             "gini_index": self._calculate_gini(all_recs_flattened),
             "shannon_entropy": self._calculate_shannon_entropy(all_recs_flattened),
-            "novelty_score": self._calculate_novelty(all_recs_flattened)
+            "novelty_score": self._calculate_novelty(all_recs_flattened),
         }
 
     def _calculate_catalog_coverage(self, unique_recs):
@@ -82,7 +85,8 @@ class RecommenderEvaluator:
         index = np.arange(1, n + 1)
         sum_freq = np.sum(frequencies)
 
-        if sum_freq == 0: return 1.0  # if nothing is recommended
+        if sum_freq == 0:
+            return 1.0  # if nothing is recommended
 
         gini = (np.sum((2 * index - n - 1) * frequencies)) / (n * sum_freq)
         return gini
@@ -107,15 +111,14 @@ class RecommenderEvaluator:
         """
         # calculate novelty for every recommended item
         self_info = [
-            -np.log2(self.item_popularity.get(item, self.min_prob))
-            for item in all_recs
+            -np.log2(self.item_popularity.get(item, self.min_prob)) for item in all_recs
         ]
         return np.mean(self_info)
 
 
 # Constants
 OUTPUT_FILE = "./Embeddings/recs_output.jsonl"
-ERROR_LOG = "processing_errors.log"
+ERROR_LOG = "./Embeddings/processing_errors.log"
 CHUNK_SIZE = 5000  # Smaller chunks for safety
 GC_FREQUENCY = 20  # Garbage collect every N users
 
@@ -131,7 +134,7 @@ def memory_cleanup():
 
 def log_error(user_id, error):
     """Log errors to file for debugging"""
-    with open(ERROR_LOG, 'a') as f:
+    with open(ERROR_LOG, "a") as f:
         f.write(f"User {user_id}: {str(error)}\n")
 
 
@@ -140,11 +143,11 @@ def get_processed_users():
     processed = set()
     if os.path.exists(OUTPUT_FILE):
         try:
-            with open(OUTPUT_FILE, 'r') as f:
+            with open(OUTPUT_FILE, "r") as f:
                 for line in f:
                     try:
                         data = json.loads(line)
-                        processed.add(str(data['user_id']))
+                        processed.add(str(data["user_id"]))
                     except json.JSONDecodeError:
                         continue
         except Exception as e:
@@ -162,8 +165,8 @@ def get_unique_users_list(parquet_path):
         user_ids = []
 
         # read in batches
-        for batch in parquet_file.iter_batches(batch_size=50000, columns=['user_id']):
-            user_ids.extend(batch.column('user_id').to_pylist())
+        for batch in parquet_file.iter_batches(batch_size=50000, columns=["user_id"]):
+            user_ids.extend(batch.column("user_id").to_pylist())
 
         unique_users = list(set(user_ids))
         del user_ids
@@ -174,8 +177,8 @@ def get_unique_users_list(parquet_path):
     except ImportError:
         # use pandas with column selection if pyarrow not available
         print("PyArrow not available, using pandas (slower)...")
-        df = pd.read_parquet(parquet_path, columns=['user_id'])
-        unique_users = df['user_id'].unique().tolist()
+        df = pd.read_parquet(parquet_path, columns=["user_id"])
+        unique_users = df["user_id"].unique().tolist()
         del df
         gc.collect()
         return unique_users
@@ -185,10 +188,12 @@ def process_single_user(user_id, user_data, index):
     """Process a single user and return recommendations"""
     try:
         # prepare watched list
-        if 'my_score' in user_data.columns:
-            watched_list = user_data[['anime_id', 'my_score']].values.tolist()
+        if "my_score" in user_data.columns:
+            watched_list = user_data[["anime_id", "my_score"]].values.tolist()
         else:
-            watched_list = [[int(anime_id), 0] for anime_id in user_data['anime_id'].values]
+            watched_list = [
+                [int(anime_id), 0] for anime_id in user_data["anime_id"].values
+            ]
 
         if not watched_list:
             return None
@@ -206,7 +211,7 @@ def process_single_user(user_id, user_data, index):
         recs_dicts = u.get_nearest_anime_from_clusters(index, top_k=10)
 
         # extract anime id
-        rec_ids = [int(anime['id']) for anime in recs_dicts]
+        rec_ids = [int(anime["id"]) for anime in recs_dicts]
 
         # cleanup for memory management
         del u
@@ -267,38 +272,47 @@ def generate_recommendations_safe():
     successful_count = 0
     error_count = 0
 
-    with open(OUTPUT_FILE, 'a', buffering=1) as f_out:  # buffering line
-
+    with open(OUTPUT_FILE, "a", buffering=1) as f_out:  # buffering line
         for chunk_idx in range(total_chunks):
             chunk_start = chunk_idx * CHUNK_SIZE
             chunk_end = min(chunk_start + CHUNK_SIZE, len(users_to_process))
             user_chunk = users_to_process[chunk_start:chunk_end]
 
-            print(f"\n>>> batch {chunk_idx + 1}/{total_chunks} (users {chunk_start + 1}-{chunk_end})")
+            print(
+                f"\n>>> batch {chunk_idx + 1}/{total_chunks} (users {chunk_start + 1}-{chunk_end})"
+            )
 
             # load data for this batch only
             try:
                 with memory_cleanup():
                     df_chunk = pd.read_parquet(
                         "./Dataset/UserAnimeList.parquet",
-                        filters=[('user_id', 'in', user_chunk)]
+                        filters=[("user_id", "in", user_chunk)],
                     )
 
                     # fixing columns name (just in case)
-                    if 'anime_id' in df_chunk.columns and 'anime_id' not in df_chunk.columns:
-                        df_chunk = df_chunk.rename(columns={'anime_id': 'anime_id'})
-                    if 'my_score' not in df_chunk.columns and 'score' in df_chunk.columns:
-                        df_chunk = df_chunk.rename(columns={'score': 'my_score'})
+                    if (
+                        "anime_id" in df_chunk.columns
+                        and "anime_id" not in df_chunk.columns
+                    ):
+                        df_chunk = df_chunk.rename(columns={"anime_id": "anime_id"})
+                    if (
+                        "my_score" not in df_chunk.columns
+                        and "score" in df_chunk.columns
+                    ):
+                        df_chunk = df_chunk.rename(columns={"score": "my_score"})
 
                     # if anime not exists
-                    if 'anime_id' not in df_chunk.columns:
+                    if "anime_id" not in df_chunk.columns:
                         print(f"      warning: 'anime_id' column missing, skipping")
                         continue
 
-                    user_groups = df_chunk.groupby('user_id')
+                    user_groups = df_chunk.groupby("user_id")
 
                     # process each user
-                    pbar = tqdm(user_chunk, desc=f"    batch {chunk_idx + 1}", leave=False)
+                    pbar = tqdm(
+                        user_chunk, desc=f"    batch {chunk_idx + 1}", leave=False
+                    )
 
                     for i, user_id in enumerate(pbar):
                         try:
@@ -313,7 +327,10 @@ def generate_recommendations_safe():
 
                             if rec_ids:
                                 # save user {id, recommendations}
-                                record = {"user_id": str(user_id), "recommendations": rec_ids}
+                                record = {
+                                    "user_id": str(user_id),
+                                    "recommendations": rec_ids,
+                                }
                                 f_out.write(json.dumps(record) + "\n")
                                 successful_count += 1
 
@@ -333,7 +350,9 @@ def generate_recommendations_safe():
                     pbar.close()
 
                     # update progress bar
-                    print(f"     batch completed - successes: {successful_count}, errors: {error_count}")
+                    print(
+                        f"     batch completed - successes: {successful_count}, errors: {error_count}"
+                    )
 
             except Exception as e:
                 print(f"     error loading batch: {e}")
@@ -363,11 +382,11 @@ def evaluate_from_file(recs_file="./Embeddings/recs_output.jsonl"):
     print("\n[1/3] loading the dataset...")
     try:
         df_interactions = pd.read_parquet("./Dataset/UserAnimeList.parquet")
-        if 'anime_id' in df_interactions.columns:
-            df_interactions = df_interactions.rename(columns={'anime_id': 'anime_id'})
+        if "anime_id" in df_interactions.columns:
+            df_interactions = df_interactions.rename(columns={"anime_id": "anime_id"})
 
         df_catalog = pd.read_csv("./Dataset/AnimeList.csv")
-        full_catalog_ids = df_catalog['id'].unique()
+        full_catalog_ids = df_catalog["id"].unique()
         print("       dataset loaded")
 
     except Exception as e:
@@ -377,11 +396,11 @@ def evaluate_from_file(recs_file="./Embeddings/recs_output.jsonl"):
     print("\n[2/3] reading recommendations...")
     all_recommendations = {}
     try:
-        with open(recs_file, 'r') as f:
+        with open(recs_file, "r") as f:
             for line in f:
                 try:
                     data = json.loads(line)
-                    all_recommendations[data['user_id']] = data['recommendations']
+                    all_recommendations[data["user_id"]] = data["recommendations"]
                 except:
                     continue
         print(f"        loaded recommendations fot {len(all_recommendations)} users")
@@ -402,7 +421,7 @@ def evaluate_from_file(recs_file="./Embeddings/recs_output.jsonl"):
     print("results")
     print("=" * 60)
     print(f"Catalog Coverage:      {metrics['catalog_coverage']:.2%} ")
-    #print(f"Gini Index:            {metrics['gini_index']:.4f} ")
+    # print(f"Gini Index:            {metrics['gini_index']:.4f} ")
     print(f"Distributional Coveragr:       {metrics['shannon_entropy']:.4f} ")
     print(f"Novelty Score:         {metrics['novelty_score']:.4f} bits")
     print("=" * 60)
