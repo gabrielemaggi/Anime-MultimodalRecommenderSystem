@@ -3,9 +3,9 @@ import pandas as pd
 from mal import client
 from sympy.codegen.ast import Raise
 
-from .clusterFinder import clusterFinder
-from .indexing_db import *
-from .UserDBConnector import UserDBConnector
+from Libs.clusterFinder import clusterFinder
+from Libs.indexing_db import *
+from Libs.UserDBConnector import UserDBConnector
 
 
 class User:
@@ -198,7 +198,7 @@ class User:
         print(self.watched)
         self.watched.append([int(anime_id), int(rating)])
 
-    def add_filtering(self, query_vector, mode="append", magnitude=1.0):
+    def add_filtering(self, query_vector, mode="append", magnitude=0.7):
         """
         Add filtering to user's cluster centroids.
         Parameters:

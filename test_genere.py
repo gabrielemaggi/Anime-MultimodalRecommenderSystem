@@ -1,10 +1,12 @@
-import pandas as pd
 import networkx as nx
 import numpy as np
-from node2vec import Node2Vec
+import pandas as pd
 from gensim.models import Word2Vec
+from node2vec import Node2Vec
+
 from Libs.indexing_db import *
 from Libs.User import *
+
 
 def get_anime_vector(model, genres, studio=None, title=None):
     """
@@ -44,16 +46,19 @@ def get_anime_vector(model, genres, studio=None, title=None):
     final_embedding = np.mean(vectors, axis=0)
     return final_embedding
 
+
 if __name__ == "__main__":
     indexer = Indexing()
     indexer.build_vector_database()
 
-    results = indexer.encode_tabular_genre_studio(genres=['Drama', 'Romance'], studios=['MAPPA'])
+    results = indexer.encode_tabular_genre_studio(
+        genres=["Drama", "Romance"], studios=["MAPPA"]
+    )
     # print(results)
 
-    embedding = results.get('genres').get('Romance')
+    embedding = results.get("genres").get("Romance")
     # print("aaaaa", embedding)
-    query = indexer.align_embedding(embedding, modality='tab')
+    query = indexer.align_embedding(embedding, modality="tab")
 
     indexer.load_vector_database()
     u = User("MrPeanut02")
@@ -61,7 +66,7 @@ if __name__ == "__main__":
     u.findCentersOfClusters()
     u.add_filtering(query, "move")
 
-    print("---"*40)
+    print("---" * 40)
     print(u.get_nearest_anime_from_clusters(indexer, 10))
 
     # similars = indexer.search(query)

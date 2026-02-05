@@ -1,10 +1,11 @@
+import copy
+import os
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-from torch.utils.data import Dataset, DataLoader
-import os
-import copy
+from torch.utils.data import DataLoader, Dataset
 
 
 class CoMMFusion(nn.Module):
@@ -12,9 +13,15 @@ class CoMMFusion(nn.Module):
         super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # --- Encoders ---
-        self.enc_syn = nn.Sequential(nn.Linear(syn_dim, output_dim), nn.ReLU(), nn.Linear(output_dim, output_dim))
-        self.enc_vis = nn.Sequential(nn.Linear(vis_dim, output_dim), nn.ReLU(), nn.Linear(output_dim, output_dim))
-        self.enc_tab = nn.Sequential(nn.Linear(tab_dim, output_dim), nn.ReLU(), nn.Linear(output_dim, output_dim))
+        self.enc_syn = nn.Sequential(
+            nn.Linear(syn_dim, output_dim), nn.ReLU(), nn.Linear(output_dim, output_dim)
+        )
+        self.enc_vis = nn.Sequential(
+            nn.Linear(vis_dim, output_dim), nn.ReLU(), nn.Linear(output_dim, output_dim)
+        )
+        self.enc_tab = nn.Sequential(
+            nn.Linear(tab_dim, output_dim), nn.ReLU(), nn.Linear(output_dim, output_dim)
+        )
         # --- Learnable Modality Importance Weights ---
         # We initialize these to 0.0 so that exp(0) = 1.0
         # This means all modalities start as equally important.
@@ -77,11 +84,18 @@ class CoMMFusion(nn.Module):
         return (loss_s + loss_v + loss_t) / 3
 
 
-
 class FusionTrainer:
-    def __init__(self, item_ids=None, syn_embs=None, vis_embs=None, tab_embs=None, output_dim=384, load_model=False):
+    def __init__(
+        self,
+        item_ids=None,
+        syn_embs=None,
+        vis_embs=None,
+        tab_embs=None,
+        output_dim=384,
+        load_model=False,
+    ):
 
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.save_path = "./Embeddings/fusion_model.pt"
 
         # Handle load_model case (model-only initialization)
@@ -89,47 +103,55 @@ class FusionTrainer:
             self.model = CoMMFusion(384, 384, 384, 384)
             self.model = self.load(self.save_path, self.device)
             # Initialize embeddings as None - they can be set later if needed
-            self.syn_embs = syn_embs.astype('float32') if syn_embs is not None else None
-            self.vis_embs = vis_embs.astype('float32') if vis_embs is not None else None
-            self.tab_embs = tab_embs.astype('float32') if tab_embs is not None else None
+            self.syn_embs = syn_embs.astype("float32") if syn_embs is not None else None
+            self.vis_embs = vis_embs.astype("float32") if vis_embs is not None else None
+            self.tab_embs = tab_embs.astype("float32") if tab_embs is not None else None
             self.item_ids = item_ids
 
         else:
             # Training mode - require embeddings
             if syn_embs is None or vis_embs is None or tab_embs is None:
-                raise ValueError("When load_model=False, syn_embs, vis_embs, and tab_embs are required for training")
+                raise ValueError(
+                    "When load_model=False, syn_embs, vis_embs, and tab_embs are required for training"
+                )
 
-            self.syn_embs = syn_embs.astype('float32')
-            self.vis_embs = vis_embs.astype('float32')
-            self.tab_embs = tab_embs.astype('float32')
+            self.syn_embs = syn_embs.astype("float32")
+            self.vis_embs = vis_embs.astype("float32")
+            self.tab_embs = tab_embs.astype("float32")
             self.item_ids = item_ids
 
             self.model = CoMMFusion(
-                syn_embs.shape[1],
-                vis_embs.shape[1],
-                tab_embs.shape[1],
-                output_dim
+                syn_embs.shape[1], vis_embs.shape[1], tab_embs.shape[1], output_dim
             ).to(self.device)
-
-
 
     def train_2(self, epochs=50, batch_size=128):
         if os.path.exists(self.save_path):
             self.load(self.save_path)
             return self.model
 
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=1e-4, weight_decay=1e-2)
-        loader = DataLoader(TensorDataset(self.syn_embs, self.vis_embs, self.tab_embs),
-                            batch_size=batch_size, shuffle=True)
+        optimizer = torch.optim.AdamW(
+            self.model.parameters(), lr=1e-4, weight_decay=1e-2
+        )
+        loader = DataLoader(
+            TensorDataset(self.syn_embs, self.vis_embs, self.tab_embs),
+            batch_size=batch_size,
+            shuffle=True,
+        )
 
         for epoch in range(epochs):
             self.model.train()
             total_loss = 0
             for syn, vis, tab in loader:
-                syn, vis, tab = syn.to(self.device), vis.to(self.device), tab.to(self.device)
+                syn, vis, tab = (
+                    syn.to(self.device),
+                    vis.to(self.device),
+                    tab.to(self.device),
+                )
 
                 # Get individual views and the shared centroid
-                z_s, z_v, z_t, centroid = self.model(syn, vis, tab, return_centroid=True)
+                z_s, z_v, z_t, centroid = self.model(
+                    syn, vis, tab, return_centroid=True
+                )
 
                 # Calculate CoMM loss
                 loss = self.model.comm_loss(z_s, z_v, z_t, centroid)
@@ -139,7 +161,7 @@ class FusionTrainer:
                 optimizer.step()
                 total_loss += loss.item()
 
-            print(f"Epoch {epoch+1} | CoMM Loss: {total_loss/len(loader):.4f}")
+            print(f"Epoch {epoch + 1} | CoMM Loss: {total_loss / len(loader):.4f}")
 
         self.save(self.save_path)
 
@@ -148,26 +170,37 @@ class FusionTrainer:
             self.load(self.save_path)
             return self.model
 
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=1e-4, weight_decay=1e-2)
+        optimizer = torch.optim.AdamW(
+            self.model.parameters(), lr=1e-4, weight_decay=1e-2
+        )
 
         # --- Early Stopping Setup ---
-        best_loss = float('inf')
+        best_loss = float("inf")
         epochs_no_improve = 0
         best_model_wts = copy.deepcopy(self.model.state_dict())
 
         # Note: Ideally, use a separate validation loader here.
         # For this example, we will monitor the training loss trend.
-        loader = DataLoader(TensorDataset(self.syn_embs, self.vis_embs, self.tab_embs),
-                            batch_size=batch_size, shuffle=True)
+        loader = DataLoader(
+            TensorDataset(self.syn_embs, self.vis_embs, self.tab_embs),
+            batch_size=batch_size,
+            shuffle=True,
+        )
 
         for epoch in range(epochs):
             self.model.train()
             total_loss = 0
 
             for syn, vis, tab in loader:
-                syn, vis, tab = syn.to(self.device), vis.to(self.device), tab.to(self.device)
+                syn, vis, tab = (
+                    syn.to(self.device),
+                    vis.to(self.device),
+                    tab.to(self.device),
+                )
 
-                z_s, z_v, z_t, centroid = self.model(syn, vis, tab, return_centroid=True)
+                z_s, z_v, z_t, centroid = self.model(
+                    syn, vis, tab, return_centroid=True
+                )
                 loss = self.model.comm_loss(z_s, z_v, z_t, centroid)
 
                 optimizer.zero_grad()
@@ -176,7 +209,7 @@ class FusionTrainer:
                 total_loss += loss.item()
 
             avg_loss = total_loss / len(loader)
-            print(f"Epoch {epoch+1} | CoMM Loss: {avg_loss:.4f}")
+            print(f"Epoch {epoch + 1} | CoMM Loss: {avg_loss:.4f}")
 
             # --- Early Stopping Logic ---
             if avg_loss < best_loss - min_delta:
@@ -186,14 +219,16 @@ class FusionTrainer:
             else:
                 epochs_no_improve += 1
                 if epochs_no_improve >= patience:
-                    print(f"Early stopping triggered at epoch {epoch+1}")
+                    print(f"Early stopping triggered at epoch {epoch + 1}")
                     # Load the best weights before exiting
                     self.model.load_state_dict(best_model_wts)
                     break
 
         self.save(self.save_path)
 
-    def transform(self, syn_embs=None, vis_embs=None, tab_embs=None, as_list: bool = False):
+    def transform(
+        self, syn_embs=None, vis_embs=None, tab_embs=None, as_list: bool = False
+    ):
         """
         Fuse embeddings using trained model.
         Returns SAME STRUCTURE as Fusion class:
@@ -204,50 +239,57 @@ class FusionTrainer:
             syn_embs, vis_embs, tab_embs = self.syn_embs, self.vis_embs, self.tab_embs
             ids = self.item_ids  # Use stored IDs
         else:
-            ids = ['query_temp']
+            ids = ["query_temp"]
 
         self.model.eval()
         with torch.no_grad():
-            syn = torch.from_numpy(syn_embs.astype('float32')).to(self.device)
-            vis = torch.from_numpy(vis_embs.astype('float32')).to(self.device)
-            tab = torch.from_numpy(tab_embs.astype('float32')).to(self.device)
+            syn = torch.from_numpy(syn_embs.astype("float32")).to(self.device)
+            vis = torch.from_numpy(vis_embs.astype("float32")).to(self.device)
+            tab = torch.from_numpy(tab_embs.astype("float32")).to(self.device)
             fused = self.model(syn, vis, tab).cpu().numpy()
 
         # RETURN STRUCTURED OUTPUT (MATCHES Fusion CLASS)
         if isinstance(ids, int):
             print({ids: fused})
-            return {'id': ids, 'embedding': fused}
+            return {"id": ids, "embedding": fused}
         else:
             result = {id_: fused[i] for i, id_ in enumerate(ids)}
-            out = [{'id': k, 'embedding': v} for k, v in result.items()] if as_list else result
+            out = (
+                [{"id": k, "embedding": v} for k, v in result.items()]
+                if as_list
+                else result
+            )
             print(out)
             return out
 
     def save(self, path: str = "fusion_model.pt"):
-        torch.save({
-            'model_state_dict': self.model.state_dict(),
-            'dims': {
-                'syn_dim': self.syn_embs.shape[1],
-                'vis_dim': self.vis_embs.shape[1],
-                'tab_dim': self.tab_embs.shape[1],
-                'output_dim': self.model.output_dim
+        torch.save(
+            {
+                "model_state_dict": self.model.state_dict(),
+                "dims": {
+                    "syn_dim": self.syn_embs.shape[1],
+                    "vis_dim": self.vis_embs.shape[1],
+                    "tab_dim": self.tab_embs.shape[1],
+                    "output_dim": self.model.output_dim,
+                },
+                "item_ids": self.item_ids,  # ← SAVE IDs FOR LATER USE
             },
-            'item_ids': self.item_ids  # ← SAVE IDs FOR LATER USE
-        }, path)
+            path,
+        )
         print(f"Model saved to {path}")
 
     def load(self, path: str, device: str = None):
         if device is None:
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            device = "cuda" if torch.cuda.is_available() else "cpu"
         checkpoint = torch.load(path, map_location=device, weights_only=False)
 
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.model.load_state_dict(checkpoint["model_state_dict"])
         self.model.to(device)
 
         self.model.eval()
         return self.model
 
-    def encode_single_modality(self, embedding, modality_type='syn'):
+    def encode_single_modality(self, embedding, modality_type="syn"):
         """
         Encode a single modality embedding through its respective encoder.
         Returns the normalized, aligned embedding in the shared space (NOT the centroid).
@@ -263,7 +305,7 @@ class FusionTrainer:
 
         # Convert to tensor if needed
         if isinstance(embedding, np.ndarray):
-            embedding = torch.from_numpy(embedding.astype('float32'))
+            embedding = torch.from_numpy(embedding.astype("float32"))
 
         # Add batch dimension if needed
         if embedding.dim() == 1:
@@ -273,20 +315,26 @@ class FusionTrainer:
 
         with torch.no_grad():
             # Select the appropriate encoder
-            if modality_type == 'syn':
+            if modality_type == "syn":
                 encoded = F.normalize(self.model.enc_syn(embedding), p=2, dim=-1)
-            elif modality_type == 'vis':
+            elif modality_type == "vis":
                 encoded = F.normalize(self.model.enc_vis(embedding), p=2, dim=-1)
-            elif modality_type == 'tab':
+            elif modality_type == "tab":
                 encoded = F.normalize(self.model.enc_tab(embedding), p=2, dim=-1)
             else:
-                raise ValueError(f"Invalid modality_type: {modality_type}. Must be 'syn', 'vis', or 'tab'")
+                raise ValueError(
+                    f"Invalid modality_type: {modality_type}. Must be 'syn', 'vis', or 'tab'"
+                )
 
         return encoded.cpu().numpy().squeeze()
+
 
 class TensorDataset(Dataset):
     def __init__(self, syn, vis, tab):
         self.syn, self.vis, self.tab = syn, vis, tab
-    def __len__(self): return len(self.syn)
+
+    def __len__(self):
+        return len(self.syn)
+
     def __getitem__(self, i):
         return self.syn[i], self.vis[i], self.tab[i]

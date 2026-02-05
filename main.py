@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from Libs import GoalParsing
 from Libs.indexing_db import *
 from Libs.User import User
 
@@ -50,6 +51,12 @@ def load_models():
     return syn_model, vis_model, index
 
 
+@st.cache_resource
+def load_goal_parser():
+    """Load the goal parsing system"""
+    return GoalParsing()
+
+
 @st.cache_data
 def get_anime_lookup():
     df = pd.read_csv("./Dataset/AnimeList.csv")
@@ -73,6 +80,7 @@ def get_available_genres_studios():
 
 
 prompt_encoder_model, image_encoder_model, index = load_models()
+goal_parser = load_goal_parser()
 
 # Session Status Init
 if "results" not in st.session_state:
@@ -92,7 +100,15 @@ if "filter_magnitude" not in st.session_state:
 if "cards_per_row" not in st.session_state:
     st.session_state.cards_per_row = 4
 if "top_k_val" not in st.session_state:
-    st.session_state.top_k_val = 12  # Your default value
+    st.session_state.top_k_val = 12
+if "text_goal" not in st.session_state:
+    st.session_state.text_goal = ""
+if "synopsis_text" not in st.session_state:
+    st.session_state.synopsis_text = ""
+if "uploaded_image" not in st.session_state:
+    st.session_state.uploaded_image = None
+if "filter_type" not in st.session_state:
+    st.session_state.filter_type = "manual"  # "manual", "text", "synopsis", or "image"
 
 
 def find_anime_image(anime_id: str) -> str | None:
@@ -130,6 +146,42 @@ def apply_filtering(
     except Exception:
         return False
     return False
+
+
+def apply_text_goal(user_obj, indexer, goal_text, parser):
+    """Apply text-based goal parsing"""
+    if not goal_text or not goal_text.strip():
+        return False
+    try:
+        parser.process_request(goal_text, user_obj, indexer)
+        return True
+    except Exception as e:
+        st.error(f"Error processing text goal: {str(e)}")
+        return False
+
+
+def apply_synopsis_filter(user_obj, indexer, synopsis_text, parser):
+    """Apply synopsis-based filtering"""
+    if not synopsis_text or not synopsis_text.strip():
+        return False
+    try:
+        parser.process_sypnopsis(synopsis_text, user_obj, indexer)
+        return True
+    except Exception as e:
+        st.error(f"Error processing synopsis: {str(e)}")
+        return False
+
+
+def apply_image_filter(user_obj, indexer, image, parser):
+    """Apply image-based filtering"""
+    if image is None:
+        return False
+    try:
+        parser.process_image(image, user_obj, indexer)
+        return True
+    except Exception as e:
+        st.error(f"Error processing image: {str(e)}")
+        return False
 
 
 def get_user_object():
@@ -179,31 +231,133 @@ with st.sidebar:
         # 3. Contextual Controls (Filters only for Recommendations)
         if page_selection == "Recommendations":
             st.subheader("🔍 Refine Results")
-            genres, studios = get_available_genres_studios()
-            st.session_state.selected_genres = st.multiselect(
-                "Genres",
-                genres,
-                key="genre_selector",
-                default=st.session_state.selected_genres,
-            )
-            st.session_state.selected_studios = st.multiselect(
-                "Studios",
-                studios,
-                key="studio_selector",
-                default=st.session_state.selected_studios,
+
+            # Filter Type Selection - simpler approach
+            filter_options = [
+                "Manual Selection",
+                "Text Description",
+                "Synopsis Search",
+                "Image Search",
+            ]
+            current_index = 0
+            if st.session_state.filter_type == "text":
+                current_index = 1
+            elif st.session_state.filter_type == "synopsis":
+                current_index = 2
+            elif st.session_state.filter_type == "image":
+                current_index = 3
+
+            selected_filter = st.radio(
+                "Filter Method:",
+                filter_options,
+                index=current_index,
+                key="filter_type_radio",
             )
 
-            if st.session_state.selected_genres or st.session_state.selected_studios:
-                with st.expander("Advanced Tuning"):
-                    st.session_state.filter_mode = st.radio(
-                        "Filter Mode",
-                        ["append", "move"],
-                        index=0 if st.session_state.filter_mode == "append" else 1,
-                    )
-                    st.session_state.filter_magnitude = st.slider(
-                        "Magnitude", 0.0, 5.0, st.session_state.filter_magnitude, 0.1
+            # Update internal state based on selection
+            if selected_filter == "Manual Selection":
+                st.session_state.filter_type = "manual"
+            elif selected_filter == "Text Description":
+                st.session_state.filter_type = "text"
+            elif selected_filter == "Synopsis Search":
+                st.session_state.filter_type = "synopsis"
+            elif selected_filter == "Image Search":
+                st.session_state.filter_type = "image"
+
+            st.divider()
+
+            # Manual Filter Mode
+            if st.session_state.filter_type == "manual":
+                st.markdown("**🎯 Manual Filters**")
+                genres, studios = get_available_genres_studios()
+                st.session_state.selected_genres = st.multiselect(
+                    "Genres",
+                    genres,
+                    key="genre_selector",
+                    default=st.session_state.selected_genres,
+                )
+                st.session_state.selected_studios = st.multiselect(
+                    "Studios",
+                    studios,
+                    key="studio_selector",
+                    default=st.session_state.selected_studios,
+                )
+
+                if (
+                    st.session_state.selected_genres
+                    or st.session_state.selected_studios
+                ):
+                    with st.expander("Advanced Tuning"):
+                        st.session_state.filter_mode = st.radio(
+                            "Filter Mode",
+                            ["append", "move"],
+                            index=0 if st.session_state.filter_mode == "append" else 1,
+                        )
+                        st.session_state.filter_magnitude = st.slider(
+                            "Magnitude",
+                            0.0,
+                            5.0,
+                            st.session_state.filter_magnitude,
+                            0.1,
+                        )
+
+            # Text Goal Mode
+            elif st.session_state.filter_type == "text":
+                st.markdown("**💬 Describe Your Preferences**")
+                st.caption(
+                    "Example: 'I want a Romance anime, in the style of mappa studio'"
+                )
+                st.session_state.text_goal = st.text_area(
+                    "What are you looking for?",
+                    value=st.session_state.text_goal,
+                    placeholder="Describe what kind of anime you want...",
+                    height=100,
+                    key="text_goal_input",
+                )
+
+                if st.session_state.text_goal:
+                    st.info(
+                        "🤖 AI will parse your request and apply appropriate filters"
                     )
 
+            # Synopsis Mode
+            elif st.session_state.filter_type == "synopsis":
+                st.markdown("**📖 Search by Synopsis**")
+                st.caption("Describe the plot or story you're looking for")
+                st.session_state.synopsis_text = st.text_area(
+                    "Synopsis/Plot Description",
+                    value=st.session_state.synopsis_text,
+                    placeholder="E.g., 'A story about time travel and parallel universes...'",
+                    height=120,
+                    key="synopsis_input",
+                )
+
+                if st.session_state.synopsis_text:
+                    st.info("📚 AI will find anime with similar storylines")
+
+            # Image Mode
+            elif st.session_state.filter_type == "image":
+                st.markdown("**🖼️ Search by Image**")
+                st.caption("Upload an anime image to find similar styles")
+                uploaded_file = st.file_uploader(
+                    "Upload Image",
+                    type=["jpg", "jpeg", "png", "webp"],
+                    key="image_uploader",
+                )
+
+                if uploaded_file is not None:
+                    st.session_state.uploaded_image = uploaded_file
+                    # Show preview
+                    st.image(
+                        uploaded_file,
+                        caption="Uploaded Image",
+                        use_container_width=True,
+                    )
+                    st.info("🎨 AI will find anime with similar visual style")
+
+            st.divider()
+
+            # Results Limit
             st.session_state.top_k_val = st.number_input(
                 "Results limit",
                 min_value=1,
@@ -212,23 +366,48 @@ with st.sidebar:
                 key="top_k_input",
             )
 
+            # Update Button
             if st.button("🚀 Update Results", type="primary", use_container_width=True):
                 with st.spinner("🔄 Refreshing..."):
                     # Use the saved user object
                     user = get_user_object()
-                    user.findCentersOfClusters()
-                    apply_filtering(
-                        user,
-                        index,
-                        st.session_state.selected_genres,
-                        st.session_state.selected_studios,
-                        st.session_state.filter_mode,
-                        st.session_state.filter_magnitude,
-                    )
-                    st.session_state.results = user.get_nearest_anime_from_clusters(
+                    user.findCentersOfClusters(index)
+
+                    # Apply appropriate filtering based on mode
+                    if st.session_state.filter_type == "manual":
+                        apply_filtering(
+                            user,
+                            index,
+                            st.session_state.selected_genres,
+                            st.session_state.selected_studios,
+                            st.session_state.filter_mode,
+                            st.session_state.filter_magnitude,
+                        )
+                    elif st.session_state.filter_type == "text":
+                        apply_text_goal(
+                            user, index, st.session_state.text_goal, goal_parser
+                        )
+                    elif st.session_state.filter_type == "synopsis":
+                        apply_synopsis_filter(
+                            user, index, st.session_state.synopsis_text, goal_parser
+                        )
+                    elif st.session_state.filter_type == "image":
+                        if st.session_state.uploaded_image:
+                            apply_image_filter(
+                                user,
+                                index,
+                                st.session_state.uploaded_image,
+                                goal_parser,
+                            )
+                        else:
+                            st.warning("⚠️ Please upload an image first")
+                            st.stop()
+
+                    results = user.get_nearest_anime_from_clusters(
                         index, st.session_state.top_k_val
                     )
 
+                    st.session_state.results = results[: st.session_state.top_k_val]
                     st.rerun()
             st.divider()
 
@@ -244,6 +423,11 @@ with st.sidebar:
             st.session_state.logged_in_user = None
             st.session_state.user_object = None
             st.session_state.results = []
+            st.session_state.text_goal = ""
+            st.session_state.synopsis_text = ""
+            st.session_state.uploaded_image = None
+            st.session_state.selected_genres = []
+            st.session_state.selected_studios = []
             st.rerun()
 
 # ---------------------------------------------------------------------------
@@ -254,6 +438,35 @@ if st.session_state.logged_in_user is not None:
 
     if page_selection == "Recommendations":
         st.title(f"🌟 Your Recommendations")
+
+        # Show active filter info
+        if st.session_state.filter_type == "manual" and (
+            st.session_state.selected_genres or st.session_state.selected_studios
+        ):
+            filter_info = []
+            if st.session_state.selected_genres:
+                filter_info.append(
+                    f"Genres: {', '.join(st.session_state.selected_genres)}"
+                )
+            if st.session_state.selected_studios:
+                filter_info.append(
+                    f"Studios: {', '.join(st.session_state.selected_studios)}"
+                )
+            st.info(f"🎯 Active Filters: {' | '.join(filter_info)}")
+        elif st.session_state.filter_type == "text" and st.session_state.text_goal:
+            st.info(f"💬 Goal: {st.session_state.text_goal}")
+        elif (
+            st.session_state.filter_type == "synopsis"
+            and st.session_state.synopsis_text
+        ):
+            st.info(
+                f"📖 Synopsis Filter: {st.session_state.synopsis_text[:100]}{'...' if len(st.session_state.synopsis_text) > 100 else ''}"
+            )
+        elif (
+            st.session_state.filter_type == "image" and st.session_state.uploaded_image
+        ):
+            st.info(f"🖼️ Image Filter: {st.session_state.uploaded_image.name}")
+
         if st.session_state.results:
             grid = st.session_state.cards_per_row
             for i in range(0, len(st.session_state.results), grid):
@@ -398,21 +611,51 @@ if st.session_state.logged_in_user is not None:
                                             u.add_anime(anime_id, rating)
 
                                             # 2. Re-calculate user clusters based on the new rating
-                                            u.findCentersOfClusters()
+                                            u.findCentersOfClusters(index)
 
                                             # 3. Apply current filters if any are selected
-                                            if (
-                                                st.session_state.selected_genres
-                                                or st.session_state.selected_studios
+                                            if st.session_state.filter_type == "manual":
+                                                if (
+                                                    st.session_state.selected_genres
+                                                    or st.session_state.selected_studios
+                                                ):
+                                                    apply_filtering(
+                                                        u,
+                                                        index,
+                                                        st.session_state.selected_genres,
+                                                        st.session_state.selected_studios,
+                                                        st.session_state.filter_mode,
+                                                        st.session_state.filter_magnitude,
+                                                    )
+                                            elif st.session_state.filter_type == "text":
+                                                if st.session_state.text_goal:
+                                                    apply_text_goal(
+                                                        u,
+                                                        index,
+                                                        st.session_state.text_goal,
+                                                        goal_parser,
+                                                    )
+                                            elif (
+                                                st.session_state.filter_type
+                                                == "synopsis"
                                             ):
-                                                apply_filtering(
-                                                    u,
-                                                    index,
-                                                    st.session_state.selected_genres,
-                                                    st.session_state.selected_studios,
-                                                    st.session_state.filter_mode,
-                                                    st.session_state.filter_magnitude,
-                                                )
+                                                if st.session_state.synopsis_text:
+                                                    apply_synopsis_filter(
+                                                        u,
+                                                        index,
+                                                        st.session_state.synopsis_text,
+                                                        goal_parser,
+                                                    )
+                                            elif (
+                                                st.session_state.filter_type == "image"
+                                            ):
+                                                if st.session_state.uploaded_image:
+                                                    apply_image_filter(
+                                                        u,
+                                                        index,
+                                                        st.session_state.uploaded_image,
+                                                        goal_parser,
+                                                    )
 
                                             # 4. Refresh the session state results
                                             st.session_state.results = (
