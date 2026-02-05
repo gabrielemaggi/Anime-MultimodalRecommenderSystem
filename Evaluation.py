@@ -212,7 +212,7 @@ def process_single_user(user_id, user_data, index):
 
         # evaluate clusters and recommendations
         u.findCentersOfClusters()
-        recs_dicts = u.get_nearest_anime_from_clusters(index, top_k=10)
+        recs_dicts = u.get_nearest_anime_from_clusters(index, top_k=30)
 
         # extract anime id
         rec_ids = [int(anime['id']) for anime in recs_dicts]
