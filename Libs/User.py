@@ -1,27 +1,40 @@
-import os
-import textwrap
-
-import matplotlib.pyplot as plt
 import pandas as pd
-import requests
 from .clusterFinder import clusterFinder
 from .indexing_db import *
 from mal import client
-from mpmath import im
 from sympy.codegen.ast import Raise
 from .UserDBConnector import UserDBConnector
 
 
 class User:
     # get a user from the db
-    def __init__(self, id):
-        self.userDBConnector = UserDBConnector()
+    def __init__(self, id, watched_list=None):
+        # 1. Assegnazioni base (veloci e comuni a tutti i casi)
+        self.id = id
         self.embeddings = None
+        self.userDBConnector = None  # Lo inizializziamo a None per sicurezza
+        self.watch_anime_info = []  # Default vuoto
+
+        # -------------------------------------------------------
+        # CASO 1: EVALUATION / BATCH (Fast Path)
+        # -------------------------------------------------------
+        # Se i dati sono stati passati da fuori (es. dal file Parquet),
+        # li usiamo immediatamente e ci fermiamo qui.
+        if watched_list is not None:
+            self.watched = watched_list
+            self.watch_anime_info = watched_list
+            return  # <--- RETURN IMPORTANTE: Esce senza aprire connessioni DB
+
+        # -------------------------------------------------------
+        # CASO 2: FLUSSO NORMALE (Slow Path)
+        # -------------------------------------------------------
+        # Solo ora, se non abbiamo i dati, istanziamo il connettore.
+        self.userDBConnector = UserDBConnector()
 
         if self.userDBConnector.check_if_user_exists(id):
-            self.id = id
+            # L'utente è nel DB
             self.watched = self.userDBConnector.get_anime_watched_by_user(id)
-
+            # self.watch_anime_info andrebbe popolato qui se serve
         else:
             API_ID = "d79a8a3b8f42750e317b0b7abc47adf2"
             api = client.Client(API_ID)
@@ -32,80 +45,26 @@ class User:
             watch_list = api.get_anime_list(username=id, limit=100, include_nsfw=True)
             self.id = id
 
-            df_anime = pd.read_csv("./dataset/AnimeList.csv")
+            df_anime = pd.read_csv("./AnimeList.csv")
 
             watched = []
             for anime in watch_list:
-                # Get ID and Score directly from the MAL API entry
-                id_mal = anime.entry.id
+                # TODO recupera anche: sinossi, immagine, genere e studio
+                # creo dizionario e poi chiamo vector_db add vector, da creare anche i metadata.
+                # solo dei dati non nel dizionario
                 title_mal = anime.entry.title
                 score = anime.list_status.score
 
-                # 1. Match based on ID (Assuming your CSV 'id' column contains MAL IDs)
-                match = df_anime[df_anime["id"] == id_mal]
+                match = df_anime[df_anime["title"].str.lower() == title_mal.lower()]
+                do_not_match = df_anime[
+                    df_anime["title"].str.lower() != title_mal.lower()
+                ]
 
                 if not match.empty:
-                    watched.append([id_mal, score])
-               # else:
-               #     print(f"Adding new anime to system: {title_mal}")
-
-               #     # 2. Call API for full details (Synopsis, Genres, etc.)
-               #     try:
-
-               #         image_dir = "./dataset/images/"
-               #         os.makedirs(image_dir, exist_ok=True)
-
-               #         fields = [
-               #             "synopsis",
-               #             "genres",
-               #             "num_episodes",
-               #             "mean",
-               #             "alternative_titles",
-               #             "main_picture",  # The API field name
-               #         ]
-
-               #         # Fetch from API
-               #         full_info = api.get_anime(id_mal, fields=fields)
-
-               #         # 1. DOWNLOAD IMAGE (using the correct documentation attribute)
-               #         # Documentation states 'main_picture_url' is the standard attribute for this library.
-               #         image_url = full_info.main_picture_url
-               #         image_path = os.path.join(image_dir, f"{id_mal}.jpg")
-
-               #         if image_url and not os.path.exists(image_path):
-               #             try:
-               #                 response = requests.get(image_url, timeout=10)
-               #                 if response.status_code == 200:
-               #                     with open(image_path, "wb") as f:
-               #                         f.write(response.content)
-               #                     print(f"Successfully downloaded: {image_path}")
-               #             except Exception as e:
-               #                 print(f"Error downloading image for ID {id_mal}: {e}")
-
-               #         # 2. MAP TO YOUR DATA DICTIONARY
-               #         data = {
-               #             "id": id_mal,
-               #             "title": full_info.title,
-               #             "genre": ", ".join([g.name for g in full_info.genres]),
-               #             "synopsis": full_info.synopsis,
-               #             "episodes": full_info.num_episodes,
-               #             "rating": full_info.mean,
-               #         }
-
-               #         # TODO: call your vector_db add vector here using 'data'
-               #         # Initialize your indexer
-               #         indexer = Indexing()
-               #         indexer.load_vector_database()
-
-               #         # Add it to the DB (it will encode synopsis, tabular, and look for the image)
-               #         indexer.add_new_anime_to_db(
-               #             data, image_path=f"./dataset/images/{id_mal}.jpg"
-               #         )
-
-               #         print(data)
-
-               #     except Exception as e:
-               #         print(f"Error fetching details for {title_mal}: {e}")
+                    anime_id = match.iloc[0]["id"]
+                    watched.append([anime_id, score])
+                else:
+                    print(f"Warning: {title_mal} do not find in the anime database.")
 
             self.watched = watched
             self.watch_anime_info = watched
@@ -134,59 +93,56 @@ class User:
         self.embeddings = kmean.get_centers()
         return self.embeddings
 
-    def get_nearest_anime_from_clusters(self, vector_db, top_k: int = 20):
+    def get_nearest_anime_from_clusters(self, vector_db, top_k: int = 10):
         """
-        Find nearest anime across all cluster centers and return a total of top_k unique, unwatched IDs
+        Find nearest anime to each cluster center and return their IDs
         """
         if not hasattr(self, "embeddings"):
             self.findCentersOfClusters()
 
         all_anime_entries = []
 
-        n_cluster = len(self.embeddings)
-        
-        if top_k < n_cluster:
-            k = n_cluster * 3
-        else:
-            k = int(top_k / n_cluster) * 3
-
-        # 1. Gather candidates
+        # 1. Gather all recommendations
         for center_embedding in self.embeddings:
             nearest_entries = vector_db.search(
-                query_embedding=center_embedding, top_k=k
+                query_embedding=center_embedding, top_k=top_k
             )
             all_anime_entries.extend(nearest_entries)
 
         # 2. PRE-PROCESS WATCHED IDS
+        # Convert self.watched [[id, score], ...] into a set of IDs for fast O(1) lookup.
+        # We cast to str() to ensure '123' (string) matches 123 (int) to avoid type mismatches.
         watched_ids = {str(item[0]) for item in self.watched}
 
         # 3. Filter duplicates and watched items
         seen_ids = set()
         unique_anime_entries = []
-
         for anime_data in all_anime_entries:
+            # Extract the ID from the dictionary (vector DB result)
+            # Ensure we use the correct key, e.g., 'id' or 'anime_id'
             current_id = str(anime_data.get("id"))
 
+            # Check if we have seen this ID in this loop OR if the user watched it
             if current_id not in seen_ids and current_id not in watched_ids:
                 seen_ids.add(current_id)
                 unique_anime_entries.append(anime_data)
 
-        # 4. Global Sort & Final Slice
-        # Sort the combined pool by similarity score
+        # Sort by similarity and slice to respect the actual top_k requested
         unique_anime_entries.sort(key=lambda x: x.get("similarity", 0), reverse=True)
-
-        # Return exactly the total amount requested (or fewer if not enough found)
-        return unique_anime_entries[:top_k]
+        return unique_anime_entries
 
     def debug_plot_watchlist(self):
         """
         Debug method: Load AnimeList.csv and plot titles and synopsis of watched anime
         self.watched format: [[anime_id, score], [anime_id, score], ...]
         """
+        import textwrap
+
+        import matplotlib.pyplot as plt
 
         try:
             # Load the anime database
-            anime_df = pd.read_csv("./dataset/AnimeList.csv")
+            anime_df = pd.read_csv("AnimeList.csv")
 
             # Extract just the anime IDs from self.watched
             watched_ids = [anime[0] for anime in self.watched]
@@ -237,56 +193,8 @@ class User:
             traceback.print_exc()
 
     def add_anime(self, anime_id, rating):
-        # print(self.watched)
+        print(self.watched)
         self.watched.append([int(anime_id), int(rating)])
-
-    def add_filtering(self, query_vector, mode="append", magnitude=1.0):
-        """
-        Add filtering to user's cluster centroids.
-        Parameters:
-        -----------
-        query_vector : numpy array or list
-            The query vector to use for filtering
-        mode : str, default='append'
-            - 'append': Add the query vector as a new centroid
-            - 'move': Move existing centroids toward the query vector
-        Returns:
-        --------
-        numpy array : Updated embeddings
-        """
-        if self.embeddings is None:
-            raise ValueError("No embeddings found. Run findCentersOfClusters() first.")
-        query_vector = np.array(query_vector)
-        if mode == "append":
-            # Original behavior: append the query as a new centroid
-            self.embeddings = np.append(self.embeddings, [query_vector], axis=0)
-
-        elif mode == "move":
-            # New behavior: move centroids toward the query vector
-            # Calculate distances from each centroid to the query
-            distances = np.linalg.norm(self.embeddings - query_vector, axis=1)
-            # Find the maximum distance (most distant centroid)
-            max_distance = np.max(distances)
-            # Heuristic: move each centroid toward query by a fraction of max_distance
-            # This ensures we don't move too much relative to the spread of centroids
-            # The farther a centroid is from the query, the less we move it (proportionally)
-            alpha = magnitude  # Tunable parameter: how much to move (0 = no move, 1 = full move to query)
-            moved_embeddings = []
-            for i, centroid in enumerate(self.embeddings):
-                # Calculate the direction vector from centroid to query
-                direction = query_vector - centroid
-                # Scale movement inversely with distance to preserve cluster structure
-                # Closer centroids move more, distant ones move less
-                movement_scale = (
-                    alpha * (1 - distances[i] / max_distance) if max_distance > 0 else 0
-                )
-                # Move the centroid
-                new_centroid = centroid + movement_scale * direction
-                moved_embeddings.append(new_centroid)
-            self.embeddings = np.array(moved_embeddings)
-        else:
-            raise ValueError(f"Unknown mode: {mode}. Use 'append' or 'move'.")
-        return self.embeddings
 
 
 if __name__ == "__main__":
@@ -298,4 +206,4 @@ if __name__ == "__main__":
     u.debug_plot_watchlist()
 
     u.findCentersOfClusters()
-    # print(u.get_nearest_anime_from_clusters(index, 100))
+    print(u.get_nearest_anime_from_clusters(index, 10))

@@ -69,7 +69,7 @@ class AnimeRetriever:
 
 # Assicurati che il file AnimeList.csv sia nella stessa cartella
 try:
-    df = pd.read_csv("AnimeList.csv")
+    df = pd.read_csv("./Dataset/AnimeList.csv")
     retriever = AnimeRetriever()
     retriever.fit(df)
 

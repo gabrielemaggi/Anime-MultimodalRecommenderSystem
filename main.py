@@ -52,7 +52,7 @@ def load_models():
 
 @st.cache_data
 def get_anime_lookup():
-    df = pd.read_csv("dataset/AnimeList.csv")
+    df = pd.read_csv("./dataset/AnimeList.csv")
     return df.set_index("id").to_dict(orient="index")
 
 
@@ -98,10 +98,10 @@ if "top_k_val" not in st.session_state:
 def find_anime_image(anime_id: str) -> str | None:
     EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
     for ext in EXTENSIONS:
-        candidate = Path(f"dataset/images/{anime_id}{ext}")
+        candidate = Path(f"./dataset/images/{anime_id}{ext}")
         if candidate.is_file():
             return str(candidate)
-    folder = Path(f"dataset/images/{anime_id}")
+    folder = Path(f"./dataset/images/{anime_id}")
     if folder.is_dir():
         for f in sorted(folder.iterdir()):
             if f.is_file() and f.suffix.lower() in EXTENSIONS:

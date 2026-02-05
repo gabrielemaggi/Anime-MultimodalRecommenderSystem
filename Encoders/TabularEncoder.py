@@ -13,8 +13,8 @@ class TabularEncoder():
         # Internal state
         self.df = None
         self.G = None
-        self.model_path = "./Embeddings/anime_tabular_model.model"
-        self.vectors_path = "./Embeddings/anime_tabular_embedding.vec"
+        self.model_path = "../Embeddings/anime_tabular_model.model"
+        self.vectors_path = "../Embeddings/anime_tabular_embedding.vec"
         self.model = None
         # self.embeddings_loaded = False
 
@@ -22,7 +22,7 @@ class TabularEncoder():
         self.__load(cvs_path)
         self.__build_graph()
         self.__train_model()
-        self.save_model("Embeddings/anime_tabular_model.model", "Embeddings/anime_tabular_embedding.vec")
+        self.save_model("../Embeddings/anime_tabular_model.model", "../Embeddings/anime_tabular_embedding.vec")
         return self.return_embeddings()
 
     def __load(self, filepath):
@@ -318,7 +318,7 @@ class TabularEncoder():
 # --- MAIN TEST SCRIPT ---
 if __name__ == "__main__":
 
-    csv_file = 'AnimeList.csv'
+    csv_file = '../AnimeList.csv'
 
     recommender = TabularEncoder(embedding_dim=384)
 
