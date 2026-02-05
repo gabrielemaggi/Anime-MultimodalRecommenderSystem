@@ -402,8 +402,8 @@ def evaluate_from_file(recs_file="recs_output.jsonl"):
     print("results")
     print("=" * 60)
     print(f"Catalog Coverage:      {metrics['catalog_coverage']:.2%} ")
-    print(f"Gini Index:            {metrics['gini_index']:.4f} ")
-    print(f"Shannon Entropy:       {metrics['shannon_entropy']:.4f} ")
+    #print(f"Gini Index:            {metrics['gini_index']:.4f} ")
+    print(f"Distributional Coveragr:       {metrics['shannon_entropy']:.4f} ")
     print(f"Novelty Score:         {metrics['novelty_score']:.4f} bits")
     print("=" * 60)
 
@@ -417,7 +417,7 @@ if __name__ == "__main__":
         #evaluate_from_file()
 
     except KeyboardInterrupt:
-        print("\n\n⚠ Interruzione manuale - progresso salvato")
+        print("\n\n keyboard interrupt - progress saved")
     except Exception as e:
-        print(f"\n\n✗ ERRORE FATALE: {e}")
+        print(f"\n\n fatal error: {e}")
         traceback.print_exc()
