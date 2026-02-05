@@ -1,8 +1,9 @@
 import pandas as pd
-from .clusterFinder import clusterFinder
-from .indexing_db import *
 from mal import client
 from sympy.codegen.ast import Raise
+
+from .clusterFinder import clusterFinder
+from .indexing_db import *
 from .UserDBConnector import UserDBConnector
 
 

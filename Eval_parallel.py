@@ -3,14 +3,31 @@ import json
 import os
 import traceback
 from collections import Counter
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
-from functools import partial
-from multiprocessing import Manager, Pool, Queue, cpu_count
 
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+
+# Force CPU-only operation - disable CUDA before any imports
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Hide all CUDA devices
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+
+# Try to set device to CPU for common ML libraries
+try:
+    import torch
+
+    torch.set_default_device("cpu")
+except ImportError:
+    pass
+
+try:
+    import tensorflow as tf
+
+    tf.config.set_visible_devices([], "GPU")
+except ImportError:
+    pass
 
 from Libs.User import *
 
@@ -119,8 +136,7 @@ class RecommenderEvaluator:
 OUTPUT_FILE = "./Embeddings/recs_output.jsonl"
 ERROR_LOG = "./Embeddings/processing_errors.log"
 CHUNK_SIZE = 5000
-NUM_WORKERS = max(1, cpu_count() - 1)  # Leave one CPU free
-BATCH_SIZE = 100  # Sub-batch size for better load balancing
+NUM_THREADS = 8  # Number of concurrent threads (adjust based on CPU)
 
 
 @contextmanager
@@ -132,17 +148,10 @@ def memory_cleanup():
         gc.collect()
 
 
-def log_error(user_id, error, lock=None):
-    """Thread-safe error logging"""
-    error_msg = f"User {user_id}: {str(error)}\n"
-
-    if lock:
-        with lock:
-            with open(ERROR_LOG, "a") as f:
-                f.write(error_msg)
-    else:
-        with open(ERROR_LOG, "a") as f:
-            f.write(error_msg)
+def log_error(user_id, error):
+    """Log errors to file for debugging"""
+    with open(ERROR_LOG, "a") as f:
+        f.write(f"User {user_id}: {str(error)}\n")
 
 
 def get_processed_users():
@@ -192,7 +201,6 @@ def get_unique_users_list(parquet_path):
 def process_single_user(user_id, user_data_dict, index):
     """
     Process a single user and return recommendations
-    Modified to accept serialized user data for multiprocessing
     """
     try:
         # Reconstruct user data from dictionary
@@ -225,21 +233,16 @@ def process_single_user(user_id, user_data_dict, index):
         raise Exception(f"User processing failed: {str(e)}")
 
 
-def worker_init(index_obj):
-    """Initialize worker process with shared index"""
-    global WORKER_INDEX
-    WORKER_INDEX = index_obj
-
-
-def process_user_batch_worker(user_batch_data):
+def process_user_threaded(user_batch_data, index):
     """
-    Worker function for parallel processing
+    Thread worker function for parallel processing
     :param user_batch_data: tuple of (user_id, user_data_dict)
+    :param index: shared index object
     :return: tuple of (user_id, recommendations or None, error_msg or None)
     """
     user_id, user_data_dict = user_batch_data
     try:
-        rec_ids = process_single_user(user_id, user_data_dict, WORKER_INDEX)
+        rec_ids = process_single_user(user_id, user_data_dict, index)
         return (user_id, rec_ids, None)
     except Exception as e:
         return (user_id, None, str(e))
@@ -274,15 +277,14 @@ def prepare_user_data_batch(df_chunk):
     return batch_data
 
 
-def generate_recommendations_advanced_parallel():
-    """
-    Advanced parallel generation with ProcessPoolExecutor for better control
-    """
+def generate_recommendations_threaded():
+    """Main generation function using threading (no multiprocessing issues)"""
     print("=" * 60)
-    print("GENERATING RECOMMENDATIONS (ADVANCED PARALLEL)")
+    print("GENERATING RECOMMENDATIONS (THREADED - CPU ONLY)")
     print("=" * 60)
-    print(f"Using {NUM_WORKERS} worker processes")
-    print(f"Batch size: {BATCH_SIZE} users per task")
+    print(f"Using {NUM_THREADS} threads")
+    print("⚠️  CUDA disabled - running on CPU only")
+    print("ℹ️  Using threading instead of multiprocessing (CUDA-safe)")
 
     # check resume point
     print("\n[1/5] Checking resume point...")
@@ -316,19 +318,14 @@ def generate_recommendations_advanced_parallel():
         print(f"       Error: {e}")
         return
 
-    # process in chunks with parallel workers
-    print("\n[4/5] Starting advanced parallel batch processing...")
+    # process in chunks with threaded workers
+    print("\n[4/5] Starting threaded batch processing...")
     print(f"      Chunk size: {CHUNK_SIZE} users")
-    print(f"      Workers: {NUM_WORKERS}")
-    print(f"      Sub-batch size: {BATCH_SIZE}")
+    print(f"      Threads: {NUM_THREADS}")
 
     total_chunks = (len(users_to_process) + CHUNK_SIZE - 1) // CHUNK_SIZE
     successful_count = 0
     error_count = 0
-
-    # Create manager for shared resources
-    manager = Manager()
-    error_lock = manager.Lock()
 
     with open(OUTPUT_FILE, "a", buffering=1) as f_out:
         for chunk_idx in range(total_chunks):
@@ -373,21 +370,17 @@ def generate_recommendations_advanced_parallel():
                         print("      No valid users in this chunk")
                         continue
 
-                    # Process with ProcessPoolExecutor for better control
-                    print(f"      Processing {len(batch_data)} users...")
+                    # Process with threads (shares memory, no CUDA fork issues)
+                    print(f"      Processing {len(batch_data)} users with threads...")
 
                     chunk_success = 0
                     chunk_errors = 0
 
-                    with ProcessPoolExecutor(
-                        max_workers=NUM_WORKERS,
-                        initializer=worker_init,
-                        initargs=(index,),
-                    ) as executor:
-                        # Submit tasks
+                    with ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
+                        # Submit all tasks
                         future_to_user = {
                             executor.submit(
-                                process_user_batch_worker, user_data
+                                process_user_threaded, user_data, index
                             ): user_data[0]
                             for user_data in batch_data
                         }
@@ -404,7 +397,7 @@ def generate_recommendations_advanced_parallel():
 
                                     if error_msg:
                                         chunk_errors += 1
-                                        log_error(user_id, error_msg, error_lock)
+                                        log_error(user_id, error_msg)
                                     elif rec_ids:
                                         record = {
                                             "user_id": str(user_id),
@@ -424,7 +417,7 @@ def generate_recommendations_advanced_parallel():
                                 except Exception as e:
                                     chunk_errors += 1
                                     user_id = future_to_user[future]
-                                    log_error(user_id, str(e), error_lock)
+                                    log_error(user_id, str(e))
                                     pbar.update(1)
 
                     successful_count += chunk_success
@@ -515,7 +508,7 @@ def evaluate_from_file(recs_file="recs_output.jsonl"):
 
 if __name__ == "__main__":
     try:
-        generate_recommendations_advanced_parallel()
+        generate_recommendations_threaded()
         # Uncomment to run evaluation after generation
         print("\n")
         evaluate_from_file()
