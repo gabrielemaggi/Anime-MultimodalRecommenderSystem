@@ -99,15 +99,23 @@ class RecommenderEvaluator:
                 continue
 
             novelty_sum = 0.0
+            all_popularities = []
             for item in rec_list:
                 # Get the popularity score for this item
-                popularity = self.item_popularity.get(item, self.min_prob)
+                if item in self.item_popularity:
+                    popularity = self.item_popularity[item]
+                else:
+                    popularity = self.min_prob
                 # Add (1 - popularity_score)
                 novelty_sum += (1 - popularity)
+                all_popularities.append(popularity)
 
             # Average for this user: (1 / |R_u|) * Σ (1 - popularity_score(i))
             user_novelty = novelty_sum / len(rec_list)
             user_novelty_scores.append(user_novelty)
+
+        min_novelty = min(user_novelty_scores) if user_novelty_scores else 0.0
+        max_popularity = max(all_popularities) if all_popularities else 0.0
 
         # Return the average novelty across all users
         return np.mean(user_novelty_scores) if user_novelty_scores else 0.0
