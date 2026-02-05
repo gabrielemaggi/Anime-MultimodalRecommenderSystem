@@ -13,7 +13,7 @@ from TabularEncoder import *
 from trainableFusion import *
 from VectorDatabase import *
 from VisualEncoder import *
-
+import torch
 
 class Indexing:
     def __init__(self):
@@ -90,7 +90,6 @@ class Indexing:
         Normalizes a list of dictionary embeddings (L2 Norm).
         Structure: [{'id': [vector]}, ...] -> Tensor -> Normalize -> [{'id': [normalized_vector]}, ...]
         """
-        import torch
 
         # 1. Flatten the list of dicts into parallel lists of IDs and Vectors
         # This assumes each dict in the list has exactly one key-value pair, based on your _align logic

@@ -144,9 +144,9 @@ class User:
         all_anime_entries = []
 
         n_cluster = len(self.embeddings)
-
+        
         if top_k < n_cluster:
-            k = n_cluster
+            k = n_cluster * 3
         else:
             k = int(top_k / n_cluster) * 3
 
