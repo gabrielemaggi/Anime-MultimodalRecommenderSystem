@@ -4,15 +4,15 @@ from indexing_db import *
 from mal import client
 from sympy.codegen.ast import Raise
 from UserDBConnector import UserDBConnector
+from UserGeneral import GeneralUser
+class User(GeneralUser):
 
+    userDBConnector = UserDBConnector()
 
-class User:
-    # get a user from the db
     def __init__(self, id, watched_list=None):
+        super().__init__( watched_list)
         # 1. Assegnazioni base (veloci e comuni a tutti i casi)
         self.id = id
-        self.embeddings = None
-        self.userDBConnector = None  # Lo inizializziamo a None per sicurezza
         self.watch_anime_info = []  # Default vuoto
 
         # -------------------------------------------------------
@@ -20,20 +20,18 @@ class User:
         # -------------------------------------------------------
         # Se i dati sono stati passati da fuori (es. dal file Parquet),
         # li usiamo immediatamente e ci fermiamo qui.
-        if watched_list is not None:
-            self.watched = watched_list
+        if self.watched is not None:
             self.watch_anime_info = watched_list
             return  # <--- RETURN IMPORTANTE: Esce senza aprire connessioni DB
 
         # -------------------------------------------------------
         # CASO 2: FLUSSO NORMALE (Slow Path)
         # -------------------------------------------------------
-        # Solo ora, se non abbiamo i dati, istanziamo il connettore.
-        self.userDBConnector = UserDBConnector()
 
-        if self.userDBConnector.check_if_user_exists(id):
+
+        if User.userDBConnector.check_if_user_exists(id):
             # L'utente è nel DB
-            self.watched = self.userDBConnector.get_anime_watched_by_user(id)
+            self.watched = User.userDBConnector.get_anime_watched_by_user(id)
             # self.watch_anime_info andrebbe popolato qui se serve
         else:
             API_ID = "d79a8a3b8f42750e317b0b7abc47adf2"
@@ -73,63 +71,11 @@ class User:
 
     # create a new User in the system
     def createNew(self, username, watched):
-        self.userDBConnector = UserDBConnector()
-        self.id = self.userDBConnector.get_unused_user_id()
+        self.id = User.userDBConnector.get_unused_user_id()
         self.watched = watched
-        self.userDBConnector.add_User(
+        User.userDBConnector.add_User(
             username, watched
         )  # maybe to delete, not sure if neccessary
-
-    def get_watchList(self):
-        return self.watched
-
-    def findCentersOfClusters(self):
-        """
-        set numbers of clusters and return the centers
-        :return:
-        """
-        kmean = clusterFinder(self.watched)
-        self.K = kmean.getK()
-        self.embeddings = kmean.get_centers()
-        return self.embeddings
-
-    def get_nearest_anime_from_clusters(self, vector_db, top_k: int = 10):
-        """
-        Find nearest anime to each cluster center and return their IDs
-        """
-        if not hasattr(self, "embeddings"):
-            self.findCentersOfClusters()
-
-        all_anime_entries = []
-
-        # 1. Gather all recommendations
-        for center_embedding in self.embeddings:
-            nearest_entries = vector_db.search(
-                query_embedding=center_embedding, top_k=top_k
-            )
-            all_anime_entries.extend(nearest_entries)
-
-        # 2. PRE-PROCESS WATCHED IDS
-        # Convert self.watched [[id, score], ...] into a set of IDs for fast O(1) lookup.
-        # We cast to str() to ensure '123' (string) matches 123 (int) to avoid type mismatches.
-        watched_ids = {str(item[0]) for item in self.watched}
-
-        # 3. Filter duplicates and watched items
-        seen_ids = set()
-        unique_anime_entries = []
-        for anime_data in all_anime_entries:
-            # Extract the ID from the dictionary (vector DB result)
-            # Ensure we use the correct key, e.g., 'id' or 'anime_id'
-            current_id = str(anime_data.get("id"))
-
-            # Check if we have seen this ID in this loop OR if the user watched it
-            if current_id not in seen_ids and current_id not in watched_ids:
-                seen_ids.add(current_id)
-                unique_anime_entries.append(anime_data)
-
-        # Sort by similarity and slice to respect the actual top_k requested
-        unique_anime_entries.sort(key=lambda x: x.get("similarity", 0), reverse=True)
-        return unique_anime_entries
 
     def debug_plot_watchlist(self):
         """
@@ -192,9 +138,7 @@ class User:
 
             traceback.print_exc()
 
-    def add_anime(self, anime_id, rating):
-        print(self.watched)
-        self.watched.append([int(anime_id), int(rating)])
+
 
 
 if __name__ == "__main__":
