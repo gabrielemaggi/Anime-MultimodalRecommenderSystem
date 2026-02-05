@@ -5,26 +5,26 @@ import traceback
 from collections import Counter
 from contextlib import contextmanager
 
+import numpy as np
 import pandas as pd
 from tqdm import tqdm
-
-from Libs.User import *
+from User import *
 
 
 class RecommenderEvaluator:
     """
     A specialized evaluation class for Recommendation Systems.
     Focuses on beyond-accuracy metrics: Catalog Coverage, Distributional Coverage (Gini/Entropy),
-    and Novelty.
+    Novelty (Inverse Popularity), and Serendipity.
     """
 
     def __init__(self, train_df, catalog_items):
         """
         Initialize the evaluator with historical data and the full product list.
-
         :param train_df: DataFrame containing historical interactions ['user_id', 'anime_id']
         :param catalog_items: List or array of all unique Item IDs available in the system
         """
+
         self.catalog = set(catalog_items)
         self.n_catalog = len(self.catalog)
 
@@ -42,10 +42,10 @@ class RecommenderEvaluator:
     def evaluate(self, rec_dict):
         """
         Run the evaluation on a set of generated recommendations.
-
         :param rec_dict: Dictionary {user_id: [list_of_recommended_items]}
         :return: Dictionary containing all computed metrics
         """
+
         # flatten all recommendation lists into a single stream of items
         all_recs_flattened = [item for sublist in rec_dict.values() for item in sublist]
         unique_recs = set(all_recs_flattened)
@@ -55,9 +55,8 @@ class RecommenderEvaluator:
 
         return {
             "catalog_coverage": self._calculate_catalog_coverage(unique_recs),
-            "gini_index": self._calculate_gini(all_recs_flattened),
             "shannon_entropy": self._calculate_shannon_entropy(all_recs_flattened),
-            "novelty_score": self._calculate_novelty(all_recs_flattened),
+            "novelty_score": self._calculate_novelty(rec_dict),  # rec_dict
         }
 
     def _calculate_catalog_coverage(self, unique_recs):
@@ -68,29 +67,6 @@ class RecommenderEvaluator:
         recommended_in_catalog = unique_recs.intersection(self.catalog)
         return len(recommended_in_catalog) / self.n_catalog
 
-    def _calculate_gini(self, all_recs):
-        """
-        Calculates the Gini Index for recommendation distribution.
-        Values near 0: Uniform distribution (fair system).
-        Values near 1: Highly skewed distribution (popularity bias).
-        """
-        n = self.n_catalog
-        counts = Counter(all_recs)
-
-        # map frequencies to all items in the catalog (unrecommended items get 0)
-        frequencies = np.array([counts.get(item, 0) for item in self.catalog])
-        frequencies = np.sort(frequencies)
-
-        # Gini formula implementation
-        index = np.arange(1, n + 1)
-        sum_freq = np.sum(frequencies)
-
-        if sum_freq == 0:
-            return 1.0  # if nothing is recommended
-
-        gini = (np.sum((2 * index - n - 1) * frequencies)) / (n * sum_freq)
-        return gini
-
     def _calculate_shannon_entropy(self, all_recs):
         """
         Measures the uncertainty/diversity of the recommendation distribution.
@@ -99,26 +75,53 @@ class RecommenderEvaluator:
         counts = Counter(all_recs)
         total_recs = len(all_recs)
 
-        # evaluate probabilities for each recommended item
-        probs = [count / total_recs for count in counts.values()]
+        # Evaluate probabilities for each recommended item
+        probs = np.array([count / total_recs for count in counts.values()])
         return -np.sum(probs * np.log2(probs))
 
-    def _calculate_novelty(self, all_recs):
+    def _calculate_novelty(self, rec_dict):
         """
-        Calculates the average Self-Information of recommended items.
-        A high score means the system suggests 'long-tail' (rare) items
-        rather than just popular ones.
+        Measures how unexpected the recommended items are to users, focusing on less-known items.
+        Novelty = Average across all users of: (1 / |R_u|) * Σ (1 - popularity_score(i)) for i in R_u
+
+        Higher novelty indicates the system is recommending less popular, more obscure items.
         """
-        # calculate novelty for every recommended item
-        self_info = [
-            -np.log2(self.item_popularity.get(item, self.min_prob)) for item in all_recs
-        ]
-        return np.mean(self_info)
+        if not rec_dict:
+            return 0.0
+
+        user_novelty_scores = []
+
+        # Calculate novelty for each user
+        for user_id, rec_list in rec_dict.items():
+            if not rec_list:
+                continue
+
+            novelty_sum = 0.0
+            all_popularities = []
+            for item in rec_list:
+                # Get the popularity score for this item
+                if item in self.item_popularity:
+                    popularity = self.item_popularity[item]
+                else:
+                    popularity = self.min_prob
+                # Add (1 - popularity_score)
+                novelty_sum += 1 - popularity
+                all_popularities.append(popularity)
+
+            # Average for this user: (1 / |R_u|) * Σ (1 - popularity_score(i))
+            user_novelty = novelty_sum / len(rec_list)
+            user_novelty_scores.append(user_novelty)
+
+        min_novelty = min(user_novelty_scores) if user_novelty_scores else 0.0
+        max_popularity = max(all_popularities) if all_popularities else 0.0
+
+        # Return the average novelty across all users
+        return np.mean(user_novelty_scores) if user_novelty_scores else 0.0
 
 
 # Constants
-OUTPUT_FILE = "./Embeddings/recs_output.jsonl"
-ERROR_LOG = "./Embeddings/processing_errors.log"
+OUTPUT_FILE = "recs_output.jsonl"
+ERROR_LOG = "processing_errors.log"
 CHUNK_SIZE = 5000  # Smaller chunks for safety
 GC_FREQUENCY = 20  # Garbage collect every N users
 
@@ -208,7 +211,7 @@ def process_single_user(user_id, user_data, index):
 
         # evaluate clusters and recommendations
         u.findCentersOfClusters()
-        recs_dicts = u.get_nearest_anime_from_clusters(index, top_k=10)
+        recs_dicts = u.get_nearest_anime_from_clusters(index, top_k=30)
 
         # extract anime id
         rec_ids = [int(anime["id"]) for anime in recs_dicts]
@@ -248,7 +251,7 @@ def generate_recommendations_safe():
     # get user list
     print("\n[3/5] user list extraction...")
     try:
-        unique_users = get_unique_users_list("./Dataset/UserAnimeList.parquet")
+        unique_users = get_unique_users_list("./Resources/UserAnimeList.parquet")
         print(f"       found {len(unique_users)} users")
 
         # filter already processed
@@ -286,7 +289,7 @@ def generate_recommendations_safe():
             try:
                 with memory_cleanup():
                     df_chunk = pd.read_parquet(
-                        "./Dataset/UserAnimeList.parquet",
+                        "./Resources/UserAnimeList.parquet",
                         filters=[("user_id", "in", user_chunk)],
                     )
 
@@ -372,7 +375,7 @@ def generate_recommendations_safe():
     print("=" * 60)
 
 
-def evaluate_from_file(recs_file="./Embeddings/recs_output.jsonl"):
+def evaluate_from_file(recs_file="recs_output.jsonl"):
     """Evaluate generated recommendations"""
 
     print("\n" + "=" * 60)
@@ -381,11 +384,11 @@ def evaluate_from_file(recs_file="./Embeddings/recs_output.jsonl"):
 
     print("\n[1/3] loading the dataset...")
     try:
-        df_interactions = pd.read_parquet("./Dataset/UserAnimeList.parquet")
+        df_interactions = pd.read_parquet("./Resources/UserAnimeList.parquet")
         if "anime_id" in df_interactions.columns:
             df_interactions = df_interactions.rename(columns={"anime_id": "anime_id"})
 
-        df_catalog = pd.read_csv("./Dataset/AnimeList.csv")
+        df_catalog = pd.read_csv("./AnimeList.csv")
         full_catalog_ids = df_catalog["id"].unique()
         print("       dataset loaded")
 
@@ -421,9 +424,8 @@ def evaluate_from_file(recs_file="./Embeddings/recs_output.jsonl"):
     print("results")
     print("=" * 60)
     print(f"Catalog Coverage:      {metrics['catalog_coverage']:.2%} ")
-    # print(f"Gini Index:            {metrics['gini_index']:.4f} ")
-    print(f"Distributional Coveragr:       {metrics['shannon_entropy']:.4f} ")
-    print(f"Novelty Score:         {metrics['novelty_score']:.4f} bits")
+    print(f"Distributional Coverage:       {metrics['shannon_entropy']:.4f} bits")
+    print(f"Novelty Score:         {metrics['novelty_score']:.4f}")
     print("=" * 60)
 
 
