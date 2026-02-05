@@ -14,14 +14,33 @@ from UserDBConnector import UserDBConnector
 
 class User:
     # get a user from the db
-    def __init__(self, id):
-        self.userDBConnector = UserDBConnector()
+    def __init__(self, id, watched_list=None):
+        # 1. Assegnazioni base (veloci e comuni a tutti i casi)
+        self.id = id
         self.embeddings = None
+        self.userDBConnector = None  # Lo inizializziamo a None per sicurezza
+        self.watch_anime_info = []  # Default vuoto
+
+        # -------------------------------------------------------
+        # CASO 1: EVALUATION / BATCH (Fast Path)
+        # -------------------------------------------------------
+        # Se i dati sono stati passati da fuori (es. dal file Parquet),
+        # li usiamo immediatamente e ci fermiamo qui.
+        if watched_list is not None:
+            self.watched = watched_list
+            self.watch_anime_info = watched_list
+            return  # <--- RETURN IMPORTANTE: Esce senza aprire connessioni DB
+
+        # -------------------------------------------------------
+        # CASO 2: FLUSSO NORMALE (Slow Path)
+        # -------------------------------------------------------
+        # Solo ora, se non abbiamo i dati, istanziamo il connettore.
+        self.userDBConnector = UserDBConnector()
 
         if self.userDBConnector.check_if_user_exists(id):
-            self.id = id
+            # L'utente è nel DB
             self.watched = self.userDBConnector.get_anime_watched_by_user(id)
-
+            # self.watch_anime_info andrebbe popolato qui se serve
         else:
             API_ID = "d79a8a3b8f42750e317b0b7abc47adf2"
             api = client.Client(API_ID)

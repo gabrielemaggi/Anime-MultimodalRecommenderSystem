@@ -151,7 +151,7 @@ if page_selection == "Recommendations":
 
                                 # --- Rating Input ---
                                 with st.form(key=f"form_rec_{anime_id}"):
-                                    rating = st.number_input(
+                                    my_score = st.number_input(
                                         "Rate (1-10)",
                                         min_value=1,
                                         max_value=10,
@@ -169,7 +169,7 @@ if page_selection == "Recommendations":
                                             else user_name
                                         )
                                         u.add_anime(
-                                            anime_id, rating
+                                            anime_id, my_score
                                         )  # Assuming add_anime(id, score)
 
                                         # 2. Recalculate Clusters and Suggestions
@@ -331,7 +331,7 @@ elif page_selection == "User History":
                         clean_history.append({
                             'id': anime_id,
                             'title': title,
-                            'rating': score
+                            'my_score': score
                         })
 
                 # 4. Visualizzazione a Griglia
@@ -348,7 +348,7 @@ elif page_selection == "User History":
                             # Estrazione dati per la card
                             current_id = str(anime_data['id'])
                             current_title = anime_data['title']
-                            current_score = anime_data['rating']
+                            current_score = anime_data['my_score']
 
                             with cols[j]:
                                 with st.container(border=True):
