@@ -1,18 +1,20 @@
 from math import sqrt
+
 import numpy as np
 from sklearn.cluster import KMeans
+
 from Libs.indexing_db import *
 
-class clusterFinder:
 
-    def __init__(self , vecArray):
+class clusterFinder:
+    def __init__(self, vec_db, vecArray):
         """
         :param vecArray: an array of vector and scores e.g : [ [ v1, 10] , [v2 , score2 ] ....]
         """
         self.num_of_anime = len(vecArray)
 
-        self.vec_db = Indexing()
-        self.vec_db.load_vector_database()
+        self.vec_db = vec_db
+        # self.vec_db.load_vector_database()
 
         self.vectors = []
         self.scores = []
@@ -27,7 +29,7 @@ class clusterFinder:
         elif self.num_of_anime <= 8:
             self.K = 2
         else:
-            self.K = int(sqrt(self.num_of_anime / 2 ))
+            self.K = int(sqrt(self.num_of_anime / 2))
 
     def get_centers(self):
         kmeans = KMeans(n_clusters=self.K)

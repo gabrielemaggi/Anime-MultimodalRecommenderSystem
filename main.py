@@ -162,7 +162,7 @@ with st.sidebar:
                 with st.spinner("🔄 Loading..."):
                     # Create and save user object in session state
                     user = User(int(user_input) if user_input.isdigit() else user_input)
-                    user.findCentersOfClusters()
+                    user.findCentersOfClusters(index)
                     st.session_state.user_object = user
                     st.session_state.results = user.get_nearest_anime_from_clusters(
                         index, 12

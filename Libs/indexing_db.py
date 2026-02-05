@@ -6,12 +6,15 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
+import torch
 import torch.nn.functional as F
-from .Fusion import *
+
 from Encoders import *
+
+from .Fusion import *
 from .trainableFusion import *
 from .VectorDatabase import *
-import torch
+
 
 class Indexing:
     def __init__(self):
@@ -377,7 +380,7 @@ class Indexing:
         if (
             not Path(self.anime_db_index).exists()
             or not Path(self.anime_db_metadata).exists()
-        ):  
+        ):
             self.build_vector_database()
             # raise FileNotFoundError(
             #     "Vector database files not found. Build database first."

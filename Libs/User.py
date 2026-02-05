@@ -85,12 +85,12 @@ class User:
     def get_watchList(self):
         return self.watched
 
-    def findCentersOfClusters(self):
+    def findCentersOfClusters(self, vec_db):
         """
         set numbers of clusters and return the centers
         :return:
         """
-        kmean = clusterFinder(self.watched)
+        kmean = clusterFinder(vec_db, self.watched)
         self.K = kmean.getK()
         self.embeddings = kmean.get_centers()
         return self.embeddings
@@ -100,7 +100,7 @@ class User:
         Find nearest anime to each cluster center and return their IDs
         """
         if not hasattr(self, "embeddings"):
-            self.findCentersOfClusters()
+            self.findCentersOfClusters(index)
 
         all_anime_entries = []
 

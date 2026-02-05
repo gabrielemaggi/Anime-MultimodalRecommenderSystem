@@ -211,7 +211,7 @@ def process_single_user(user_id, user_data, index):
             return None
 
         # evaluate clusters and recommendations
-        u.findCentersOfClusters()
+        u.findCentersOfClusters(index)
         recs_dicts = u.get_nearest_anime_from_clusters(index, top_k=30)
 
         # extract anime id
