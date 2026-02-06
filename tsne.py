@@ -1,5 +1,6 @@
 """
 Test script for visualizing user clusters and recommendations using t-SNE
+IMPROVED VERSION: Uses cosine similarity and better visualization parameters
 """
 
 import matplotlib.pyplot as plt
@@ -8,6 +9,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.patches import Circle
 from sklearn.manifold import TSNE
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Import your classes
 from Libs.indexing_db import Indexing
@@ -41,7 +43,7 @@ class UserClusterVisualizer:
         # Get recommendations
         print(f"Getting recommendations...")
         self.recommendations = self.user.get_nearest_anime_from_clusters(
-            self.index, top_k=15
+            self.index, top_k=30
         )
 
         # Get watched anime embeddings
@@ -84,6 +86,18 @@ class UserClusterVisualizer:
                 print(f"Warning: Could not get embedding for recommendation: {e}")
 
         return embeddings
+
+    def _cosine_similarity(self, vec1, vec2):
+        """Calculate cosine similarity between two vectors"""
+        return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+
+    def _closest_cluster_cosine(self, embedding):
+        """Find the closest cluster centroid using cosine similarity"""
+        similarities = [
+            self._cosine_similarity(embedding, centroid)
+            for centroid in self.user.embeddings
+        ]
+        return np.argmax(similarities)  # Highest similarity = closest
 
     def plot_clusters_and_recommendations(self, perplexity=30, random_state=42):
         """
@@ -140,14 +154,23 @@ class UserClusterVisualizer:
         print(f"  - {len(self.watched_embeddings)} watched anime")
         print(f"  - {len(rec_embeddings)} recommendations")
 
-        # Run t-SNE
+        # IMPROVED: Use cosine similarity as the distance metric
+        # First, normalize all embeddings
+        norms = np.linalg.norm(all_embeddings, axis=1, keepdims=True)
+        all_embeddings_normalized = all_embeddings / (norms + 1e-8)
+
+        # Run t-SNE with better parameters
         tsne = TSNE(
             n_components=2,
             perplexity=min(perplexity, len(all_embeddings) - 1),
             random_state=random_state,
-            # n_iter=1000,
+            max_iter=1000,  # Increased iterations (default is 1000)
+            learning_rate=200.0,  # Better learning rate
+            metric="cosine",  # Use cosine distance - critical for semantic embeddings!
+            init="random",
+            verbose=1,
         )
-        embeddings_2d = tsne.fit_transform(all_embeddings)
+        embeddings_2d = tsne.fit_transform(all_embeddings_normalized)
 
         # Create visualization
         fig, ax = plt.subplots(figsize=(16, 12))
@@ -207,11 +230,31 @@ class UserClusterVisualizer:
             zorder=5,
         )
 
-        # Add circles around clusters to show their influence
-        for i in cluster_idx:
+        # IMPROVED: Calculate adaptive radius for circles based on actual distances
+        # in the t-SNE space
+        for i, cluster_idx_val in enumerate(cluster_idx):
+            # Find points assigned to this cluster
+            cluster_points_indices = [
+                j
+                for j in watched_idx
+                if self._closest_cluster_cosine(all_embeddings[j]) == i
+            ]
+
+            if cluster_points_indices:
+                # Calculate average distance to points in this cluster
+                cluster_center = embeddings_2d[cluster_idx_val]
+                distances = [
+                    np.linalg.norm(embeddings_2d[j] - cluster_center)
+                    for j in cluster_points_indices
+                ]
+                avg_distance = np.mean(distances) if distances else 5
+                radius = avg_distance * 1.5  # Scale factor for visibility
+            else:
+                radius = 5
+
             circle = Circle(
-                (embeddings_2d[i, 0], embeddings_2d[i, 1]),
-                radius=5,
+                (embeddings_2d[cluster_idx_val, 0], embeddings_2d[cluster_idx_val, 1]),
+                radius=radius,
                 fill=False,
                 edgecolor="red",
                 linestyle="--",
@@ -232,8 +275,51 @@ class UserClusterVisualizer:
                 va="center",
             )
 
-        # Annotate top 5 recommendations
-        for i, idx in enumerate(list(rec_idx)[:5]):
+        # Annotate top watched anime (highest rated)
+        # Sort watched anime by score to show the best ones
+        watched_with_idx = [
+            (
+                i + n_clusters,
+                self.watched_embeddings[i],
+            )  # (index in embeddings_2d, item)
+            for i in range(len(self.watched_embeddings))
+        ]
+        watched_sorted = sorted(
+            watched_with_idx, key=lambda x: x[1]["score"], reverse=True
+        )
+
+        num_watched_to_show = 10  # Change this number to show more/fewer watched anime
+        for rank, (idx, item) in enumerate(watched_sorted[:num_watched_to_show]):
+            # Get anime title from the index
+            anime_info = self.index.get_anime_info_by_id(int(item["id"]))
+            if anime_info:
+                title = (
+                    anime_info.get("title_english")
+                    or anime_info.get("title")
+                    or f"Anime {item['id']}"
+                )
+
+                ax.annotate(
+                    f"{title[:25]} ({item['score']}⭐)",
+                    (embeddings_2d[idx, 0], embeddings_2d[idx, 1]),
+                    fontsize=8,
+                    color="darkblue",
+                    xytext=(
+                        -10,
+                        -10,
+                    ),  # Offset in opposite direction from recommendations
+                    textcoords="offset points",
+                    bbox=dict(
+                        boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.7
+                    ),
+                    arrowprops=dict(
+                        arrowstyle="->", connectionstyle="arc3,rad=-0.3", color="blue"
+                    ),
+                )
+
+        # Annotate top recommendations
+        num_recs_to_show = 15  # Change this number to show more/fewer recommendations
+        for i, idx in enumerate(list(rec_idx)[:num_recs_to_show]):
             rec_info = rec_embeddings[i]
             ax.annotate(
                 rec_info["title"][:30],
@@ -256,7 +342,7 @@ class UserClusterVisualizer:
         ax.set_xlabel("t-SNE Dimension 1", fontsize=14)
         ax.set_ylabel("t-SNE Dimension 2", fontsize=14)
         ax.set_title(
-            f'User "{self.username}" - Anime Clusters and Recommendations (t-SNE Visualization)',
+            f'User "{self.username}" - Anime Clusters and Recommendations (t-SNE with Cosine Distance)',
             fontsize=16,
             fontweight="bold",
             pad=20,
@@ -297,7 +383,7 @@ class UserClusterVisualizer:
             scores = [
                 item["score"]
                 for item in self.watched_embeddings
-                if self._closest_cluster(item["embedding"]) == i
+                if self._closest_cluster_cosine(item["embedding"]) == i
             ]
             cluster_avg_scores.append(np.mean(scores) if scores else 0)
 
@@ -344,7 +430,7 @@ class UserClusterVisualizer:
         axes[1, 1].barh(y_pos, similarities, color="lightgreen", edgecolor="darkgreen")
         axes[1, 1].set_yticks(y_pos)
         axes[1, 1].set_yticklabels(titles, fontsize=9)
-        axes[1, 1].set_xlabel("Similarity Score", fontsize=12)
+        axes[1, 1].set_xlabel("Cosine Similarity Score", fontsize=12)
         axes[1, 1].set_title("Top 10 Recommendations", fontsize=14, fontweight="bold")
         axes[1, 1].invert_yaxis()
         axes[1, 1].grid(axis="x", alpha=0.3)
@@ -359,20 +445,54 @@ class UserClusterVisualizer:
 
         return fig, axes
 
+    def plot_similarity_heatmap(self):
+        """
+        Create a heatmap showing cosine similarities between cluster centroids
+        """
+        n_clusters = len(self.user.embeddings)
+
+        # Calculate pairwise cosine similarities
+        similarity_matrix = np.zeros((n_clusters, n_clusters))
+        for i in range(n_clusters):
+            for j in range(n_clusters):
+                similarity_matrix[i, j] = self._cosine_similarity(
+                    self.user.embeddings[i], self.user.embeddings[j]
+                )
+
+        # Create heatmap
+        fig, ax = plt.subplots(figsize=(10, 8))
+        sns.heatmap(
+            similarity_matrix,
+            annot=True,
+            fmt=".3f",
+            cmap="RdYlGn",
+            center=0.5,
+            vmin=0,
+            vmax=1,
+            xticklabels=[f"C{i + 1}" for i in range(n_clusters)],
+            yticklabels=[f"C{i + 1}" for i in range(n_clusters)],
+            ax=ax,
+            cbar_kws={"label": "Cosine Similarity"},
+        )
+        ax.set_title(
+            f"Cluster Centroid Similarity Matrix\n(User: {self.username})",
+            fontsize=14,
+            fontweight="bold",
+            pad=20,
+        )
+        plt.tight_layout()
+
+        return fig, ax
+
     def _assign_watched_to_clusters(self):
-        """Assign each watched anime to its nearest cluster"""
+        """Assign each watched anime to its nearest cluster using cosine similarity"""
         assignments = {i: [] for i in range(len(self.user.embeddings))}
 
         for item in self.watched_embeddings:
-            cluster_id = self._closest_cluster(item["embedding"])
+            cluster_id = self._closest_cluster_cosine(item["embedding"])
             assignments[cluster_id].append(item)
 
         return assignments
-
-    def _closest_cluster(self, embedding):
-        """Find the closest cluster centroid to an embedding"""
-        distances = np.linalg.norm(self.user.embeddings - embedding, axis=1)
-        return np.argmin(distances)
 
     def save_visualizations(self, output_dir="./visualizations"):
         """Save all visualizations to files"""
@@ -381,6 +501,7 @@ class UserClusterVisualizer:
         os.makedirs(output_dir, exist_ok=True)
 
         # Main t-SNE plot
+        print("Generating t-SNE visualization...")
         fig1, _ = self.plot_clusters_and_recommendations()
         fig1.savefig(
             f"{output_dir}/user_{self.username}_tsne.png", dpi=300, bbox_inches="tight"
@@ -388,6 +509,7 @@ class UserClusterVisualizer:
         print(f"Saved: {output_dir}/user_{self.username}_tsne.png")
 
         # Cluster details
+        print("Generating cluster details...")
         fig2, _ = self.plot_cluster_details()
         fig2.savefig(
             f"{output_dir}/user_{self.username}_details.png",
@@ -395,6 +517,16 @@ class UserClusterVisualizer:
             bbox_inches="tight",
         )
         print(f"Saved: {output_dir}/user_{self.username}_details.png")
+
+        # Similarity heatmap
+        print("Generating similarity heatmap...")
+        fig3, _ = self.plot_similarity_heatmap()
+        fig3.savefig(
+            f"{output_dir}/user_{self.username}_heatmap.png",
+            dpi=300,
+            bbox_inches="tight",
+        )
+        print(f"Saved: {output_dir}/user_{self.username}_heatmap.png")
 
         plt.close("all")
 
@@ -409,7 +541,7 @@ def test_user_visualization(username="MrPeanut02"):
         MyAnimeList username to visualize
     """
     print("=" * 80)
-    print(f"USER CLUSTER VISUALIZATION TEST")
+    print(f"USER CLUSTER VISUALIZATION TEST (IMPROVED WITH COSINE SIMILARITY)")
     print("=" * 80)
 
     # Load vector database
@@ -432,12 +564,15 @@ def test_user_visualization(username="MrPeanut02"):
     print("\n4. Generating cluster details...")
     fig2, ax2 = visualizer.plot_cluster_details()
 
+    print("\n5. Generating similarity heatmap...")
+    fig3, ax3 = visualizer.plot_similarity_heatmap()
+
     # Save visualizations
-    print("\n5. Saving visualizations...")
+    print("\n6. Saving visualizations...")
     visualizer.save_visualizations()
 
     # Show plots
-    print("\n6. Displaying plots...")
+    print("\n7. Displaying plots...")
     plt.show()
 
     print("\n" + "=" * 80)
@@ -449,7 +584,7 @@ def test_user_visualization(username="MrPeanut02"):
 
 if __name__ == "__main__":
     # Test with default user
-    visualizer = test_user_visualization("symonx99")
+    visualizer = test_user_visualization("MrPeanut02")
 
     # You can also test with a different user:
     # visualizer = test_user_visualization("YourUsername")

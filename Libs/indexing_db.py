@@ -629,3 +629,23 @@ class Indexing:
         print(
             f"✅ Successfully added '{meta.get('title')}' to the vector database and saved."
         )
+
+    def get_anime_info_by_id(self, anime_id: int):
+        """
+        Retrieves the row where the column 'id' matches the given anime_id.
+        """
+        df = self._load_dataset()
+
+        # Filter the dataframe where the column 'id' matches our input
+        # This works regardless of what the dataframe index is set to
+        result = df[df["id"] == int(anime_id)]
+
+        if not result.empty:
+            # result.iloc[0] gets the first matching row
+            # .to_dict() converts it to the format you need
+            row_dict = result.iloc[0].to_dict()
+
+            # Clean up 'nan' values so they don't break your title extraction logic
+            return {k: (v if pd.notnull(v) else None) for k, v in row_dict.items()}
+
+        return None
