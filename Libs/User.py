@@ -95,43 +95,49 @@ class User:
         self.embeddings = kmean.get_centers()
         return self.embeddings
 
-    def get_nearest_anime_from_clusters(self, index, top_k: int = 10):
+    def get_nearest_anime_from_clusters(self, vector_db, top_k: int = 20):
         """
-        Find nearest anime to each cluster center and return their IDs
+        Find nearest anime across all cluster centers and return a total of top_k unique, unwatched IDs
         """
         if not hasattr(self, "embeddings"):
-            self.findCentersOfClusters(index)
+            self.findCentersOfClusters()
 
         all_anime_entries = []
 
-        # 1. Gather all recommendations
+        n_cluster = len(self.embeddings)
+
+        if top_k < n_cluster:
+            k = n_cluster * 3
+        else:
+            k = int(top_k / n_cluster) * 3
+
+        # 1. Gather candidates
         for center_embedding in self.embeddings:
-            nearest_entries = index.search(
-                query_embedding=center_embedding, top_k=top_k
+            nearest_entries = vector_db.search(
+                query_embedding=center_embedding, top_k=k
             )
             all_anime_entries.extend(nearest_entries)
 
         # 2. PRE-PROCESS WATCHED IDS
-        # Convert self.watched [[id, score], ...] into a set of IDs for fast O(1) lookup.
-        # We cast to str() to ensure '123' (string) matches 123 (int) to avoid type mismatches.
         watched_ids = {str(item[0]) for item in self.watched}
 
         # 3. Filter duplicates and watched items
         seen_ids = set()
         unique_anime_entries = []
+
         for anime_data in all_anime_entries:
-            # Extract the ID from the dictionary (vector DB result)
-            # Ensure we use the correct key, e.g., 'id' or 'anime_id'
             current_id = str(anime_data.get("id"))
 
-            # Check if we have seen this ID in this loop OR if the user watched it
             if current_id not in seen_ids and current_id not in watched_ids:
                 seen_ids.add(current_id)
                 unique_anime_entries.append(anime_data)
 
-        # Sort by similarity and slice to respect the actual top_k requested
+        # 4. Global Sort & Final Slice
+        # Sort the combined pool by similarity score
         unique_anime_entries.sort(key=lambda x: x.get("similarity", 0), reverse=True)
-        return unique_anime_entries
+
+        # Return exactly the total amount requested (or fewer if not enough found)
+        return unique_anime_entries[:top_k]
 
     def debug_plot_watchlist(self):
         """
