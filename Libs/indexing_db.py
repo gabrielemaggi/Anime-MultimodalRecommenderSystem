@@ -30,9 +30,10 @@ class Indexing:
 
         self.image_dir = Path("./Dataset/images/")
         self.dataset = Path("./Dataset/AnimeList.csv")
-        self.anime_db_index = "./Embeddings/AnimeVecDb.index"
-        self.anime_db_metadata = "./Embeddings/AnimeVecDb.pkl"
 
+        self.anime_db_index = "./Embeddings/Attention_AnimeVecDb.index"
+        self.anime_db_metadata = "./Embeddings/Attention_AnimeVecDb.pkl"
+        self.fusion_model = "./Embeddings/fusion_model_attention_is_what_you_need.pt"
         # Metadata columns to store
         self.AM = ["title", "title_english", "title_japanese", "genre", "sypnopsis"]
 
@@ -45,7 +46,8 @@ class Indexing:
         # Fusion settings (store for encoding queries)
         self.fusion_method = "trainable"
         self.fusion_weights = [0.7, 0.1, 0.2]
-        self.fusion_engine = FusionTrainer(load_model=True)
+
+        self.fusion_engine = None  # FusionTrainer()  # load_model=True)
 
     def _load_dataset(self) -> pd.DataFrame:
         """Load and cache the dataset"""
@@ -281,7 +283,11 @@ class Indexing:
 
         if method == "trainable":
             fusion_engine = FusionTrainer(
-                anime_id, synopsis_emb, visual_emb, tabular_emb, 384, load_model=True
+                anime_id,
+                synopsis_emb,
+                visual_emb,
+                tabular_emb,
+                384,
             )
             fusion_engine.train()
             fused = fusion_engine.transform()
@@ -519,7 +525,9 @@ class Indexing:
 
     def align_embedding(self, embedding, modality):
         # print(embedding)
-        aligned = self.fusion_engine.encode_single_modality(embedding, modality)
+        aligned = None
+        if os.path.exists(self.fusion_model):
+            aligned = self.fusion_engine.encode_single_modality(embedding, modality)
         return aligned
 
     def encode_tabular_genre_studio(self, genres=None, studios=None):
