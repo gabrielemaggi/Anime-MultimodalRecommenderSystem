@@ -518,6 +518,8 @@ class Indexing:
 
         return self.vector_db.search(query_embedding, k=top_k)
 
+
+
     def search_by_id(self, anime_id: Union[str, int], top_k: int = 5) -> List[dict]:
         """
         Find similar anime by encoding an anime ID from the dataset

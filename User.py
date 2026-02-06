@@ -150,4 +150,5 @@ if __name__ == "__main__":
     u.debug_plot_watchlist()
 
     u.findCentersOfClusters()
+
     print(u.get_nearest_anime_from_clusters(index, 10))

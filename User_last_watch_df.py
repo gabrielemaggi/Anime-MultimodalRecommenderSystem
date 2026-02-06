@@ -35,11 +35,13 @@ class User_test_df:
         self.filterd_df['lastwatched'] = self.filterd_df['id_score_pair'].apply(lambda x: x[-k:])
         self.filterd_df['lastwatched'] = self.filterd_df['lastwatched'].apply(lambda x : [pair for pair in x if pair[1] > 6])
         self.filterd_df = self.filterd_df[self.filterd_df['lastwatched'].apply(len) > 0]
-
+        self.filterd_df = self.filterd_df[['username', 'watched_anime', 'lastwatched']]
     def getDataFrame(self):
         return self.filterd_df
 
 #test for user_last_watched_df
 if __name__ =='__main__':
-    u = User_test_df(2)
-    u.getDataFrame()
+    from recall_at_k import *
+    r = precision_recall_at_k(10 ,5)
+    r.predict_next_anime_test()
+    r.calculate_precision_recall_at_k_df()

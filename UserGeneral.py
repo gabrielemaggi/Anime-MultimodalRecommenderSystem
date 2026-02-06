@@ -58,6 +58,7 @@ class GeneralUser:
         unique_anime_entries.sort(key=lambda x: x.get("similarity", 0), reverse=True)
         return unique_anime_entries
 
+
     def add_anime(self, anime_id, rating):
         print(self.watched)
         self.watched.append([int(anime_id), int(rating)])
