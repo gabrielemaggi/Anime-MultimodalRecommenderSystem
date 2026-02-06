@@ -99,7 +99,9 @@ class UserClusterVisualizer:
         ]
         return np.argmax(similarities)  # Highest similarity = closest
 
-    def plot_clusters_and_recommendations(self, perplexity=30, random_state=42):
+    def plot_clusters_and_recommendations(
+        self, perplexity=30, random_state=42, show_genres=None
+    ):
         """
         Create a 2D t-SNE visualization of clusters, watched anime, and recommendations
 
@@ -109,6 +111,8 @@ class UserClusterVisualizer:
             t-SNE perplexity parameter
         random_state : int, default=42
             Random seed for reproducibility
+        show_genres : list of str, optional
+            List of genre names to show as background bubbles (e.g., ["Action", "Romance"])
         """
         # Prepare data for t-SNE
         all_embeddings = []
@@ -116,6 +120,41 @@ class UserClusterVisualizer:
         colors = []
         sizes = []
         alphas = []
+
+        # 0. Add genre embeddings (if requested) - these go first as background
+        genre_info = []
+        if show_genres:
+            print(
+                f"\nEncoding {len(show_genres)} genres for background visualization..."
+            )
+            for genre_name in show_genres:
+                try:
+                    # Encode the genre
+                    results = self.index.encode_tabular_genre_studio(
+                        genres=[genre_name], studios=[]
+                    )
+                    genre_embedding = results.get("genres").get(genre_name)
+
+                    if genre_embedding is not None:
+                        # Align embedding to the same space as anime embeddings
+                        aligned_embedding = self.index.align_embedding(
+                            genre_embedding, modality="tab"
+                        )
+                        all_embeddings.append(aligned_embedding)
+                        labels.append(f"Genre: {genre_name}")
+                        genre_info.append(
+                            {"name": genre_name, "index": len(all_embeddings) - 1}
+                        )
+                        colors.append("gray")
+                        sizes.append(500)  # Large size for visibility
+                        alphas.append(0.2)  # Very transparent
+                        print(f"  ✓ Added genre: {genre_name}")
+                    else:
+                        print(f"  ✗ Could not encode genre: {genre_name}")
+                except Exception as e:
+                    print(f"  ✗ Error encoding genre {genre_name}: {e}")
+
+        n_genres = len(genre_info)
 
         # 1. Add cluster centroids
         for i, centroid in enumerate(self.user.embeddings):
@@ -150,6 +189,8 @@ class UserClusterVisualizer:
         all_embeddings = np.array(all_embeddings)
 
         print(f"\nRunning t-SNE on {len(all_embeddings)} points...")
+        if show_genres:
+            print(f"  - {n_genres} genre embeddings (background)")
         print(f"  - {len(self.user.embeddings)} cluster centroids")
         print(f"  - {len(self.watched_embeddings)} watched anime")
         print(f"  - {len(rec_embeddings)} recommendations")
@@ -167,7 +208,7 @@ class UserClusterVisualizer:
             max_iter=1000,  # Increased iterations (default is 1000)
             learning_rate=200.0,  # Better learning rate
             metric="cosine",  # Use cosine distance - critical for semantic embeddings!
-            init="random",
+            init="pca",
             verbose=1,
         )
         embeddings_2d = tsne.fit_transform(all_embeddings_normalized)
@@ -176,13 +217,59 @@ class UserClusterVisualizer:
         fig, ax = plt.subplots(figsize=(16, 12))
 
         # Separate indices for each category
+        genre_idx = range(0, n_genres) if show_genres else []
         n_clusters = len(self.user.embeddings)
         n_watched = len(self.watched_embeddings)
         n_recommendations = len(rec_embeddings)
 
-        cluster_idx = range(0, n_clusters)
-        watched_idx = range(n_clusters, n_clusters + n_watched)
-        rec_idx = range(n_clusters + n_watched, len(all_embeddings))
+        cluster_idx = range(n_genres, n_genres + n_clusters)
+        watched_idx = range(n_genres + n_clusters, n_genres + n_clusters + n_watched)
+        rec_idx = range(n_genres + n_clusters + n_watched, len(all_embeddings))
+
+        # Plot genre bubbles as background (if requested)
+        if show_genres and genre_info:
+            # Define distinct colors for genres
+            genre_colors = [
+                "purple",
+                "orange",
+                "pink",
+                "cyan",
+                "yellow",
+                "brown",
+                "lime",
+                "magenta",
+            ]
+
+            for i, genre in enumerate(genre_info):
+                idx = genre["index"]
+                color = genre_colors[i % len(genre_colors)]
+
+                # Draw large semi-transparent circle
+                circle = Circle(
+                    (embeddings_2d[idx, 0], embeddings_2d[idx, 1]),
+                    radius=8,  # Large radius for background effect
+                    fill=True,
+                    facecolor=color,
+                    edgecolor=color,
+                    alpha=0.15,
+                    linewidth=2,
+                    zorder=0,  # Behind everything
+                )
+                ax.add_patch(circle)
+
+                # Add genre label
+                ax.text(
+                    embeddings_2d[idx, 0],
+                    embeddings_2d[idx, 1],
+                    genre["name"],
+                    fontsize=14,
+                    fontweight="bold",
+                    color=color,
+                    alpha=0.6,
+                    ha="center",
+                    va="center",
+                    zorder=1,
+                )
 
         # Plot watched anime (with score-based coloring)
         watched_points = embeddings_2d[watched_idx]
@@ -199,6 +286,7 @@ class UserClusterVisualizer:
             label="Watched Anime",
             vmin=0,
             vmax=10,
+            zorder=3,
         )
 
         # Plot recommendations
@@ -213,6 +301,7 @@ class UserClusterVisualizer:
             linewidth=1.5,
             marker="^",
             label="Recommendations",
+            zorder=4,
         )
 
         # Plot cluster centroids with star markers
@@ -260,6 +349,7 @@ class UserClusterVisualizer:
                 linestyle="--",
                 linewidth=1.5,
                 alpha=0.3,
+                zorder=2,
             )
             ax.add_patch(circle)
 
@@ -292,30 +382,24 @@ class UserClusterVisualizer:
         for rank, (idx, item) in enumerate(watched_sorted[:num_watched_to_show]):
             # Get anime title from the index
             anime_info = self.index.get_anime_info_by_id(int(item["id"]))
-            if anime_info:
-                title = (
-                    anime_info.get("title_english")
-                    or anime_info.get("title")
-                    or f"Anime {item['id']}"
-                )
+            title = (
+                anime_info.get("title", f"Anime {item['id']}")
+                if anime_info
+                else f"Anime {item['id']}"
+            )
 
-                ax.annotate(
-                    f"{title[:25]} ({item['score']}⭐)",
-                    (embeddings_2d[idx, 0], embeddings_2d[idx, 1]),
-                    fontsize=8,
-                    color="darkblue",
-                    xytext=(
-                        -10,
-                        -10,
-                    ),  # Offset in opposite direction from recommendations
-                    textcoords="offset points",
-                    bbox=dict(
-                        boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.7
-                    ),
-                    arrowprops=dict(
-                        arrowstyle="->", connectionstyle="arc3,rad=-0.3", color="blue"
-                    ),
-                )
+            ax.annotate(
+                f"{title[:25]} ({item['score']}⭐)",
+                (embeddings_2d[idx, 0], embeddings_2d[idx, 1]),
+                fontsize=8,
+                color="darkblue",
+                xytext=(-10, -10),  # Offset in opposite direction from recommendations
+                textcoords="offset points",
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.7),
+                arrowprops=dict(
+                    arrowstyle="->", connectionstyle="arc3,rad=-0.3", color="blue"
+                ),
+            )
 
         # Annotate top recommendations
         num_recs_to_show = 15  # Change this number to show more/fewer recommendations
@@ -494,15 +578,24 @@ class UserClusterVisualizer:
 
         return assignments
 
-    def save_visualizations(self, output_dir="./visualizations"):
-        """Save all visualizations to files"""
+    def save_visualizations(self, output_dir="./visualizations", show_genres=None):
+        """
+        Save all visualizations to files
+
+        Parameters:
+        -----------
+        output_dir : str
+            Directory to save visualizations
+        show_genres : list of str, optional
+            List of genres to show as background bubbles
+        """
         import os
 
         os.makedirs(output_dir, exist_ok=True)
 
         # Main t-SNE plot
         print("Generating t-SNE visualization...")
-        fig1, _ = self.plot_clusters_and_recommendations()
+        fig1, _ = self.plot_clusters_and_recommendations(show_genres=show_genres)
         fig1.savefig(
             f"{output_dir}/user_{self.username}_tsne.png", dpi=300, bbox_inches="tight"
         )
@@ -531,7 +624,7 @@ class UserClusterVisualizer:
         plt.close("all")
 
 
-def test_user_visualization(username="MrPeanut02"):
+def test_user_visualization(username="MrPeanut02", show_genres=None):
     """
     Main test function to visualize a user's clusters and recommendations
 
@@ -539,6 +632,8 @@ def test_user_visualization(username="MrPeanut02"):
     -----------
     username : str
         MyAnimeList username to visualize
+    show_genres : list of str, optional
+        List of genres to show as background bubbles (e.g., ["Action", "Romance", "Fantasy"])
     """
     print("=" * 80)
     print(f"USER CLUSTER VISUALIZATION TEST (IMPROVED WITH COSINE SIMILARITY)")
@@ -559,7 +654,9 @@ def test_user_visualization(username="MrPeanut02"):
 
     # Generate visualizations
     print("\n3. Generating t-SNE visualization...")
-    fig1, ax1 = visualizer.plot_clusters_and_recommendations()
+    if show_genres:
+        print(f"   Including genre bubbles: {show_genres}")
+    fig1, ax1 = visualizer.plot_clusters_and_recommendations(show_genres=show_genres)
 
     print("\n4. Generating cluster details...")
     fig2, ax2 = visualizer.plot_cluster_details()
@@ -569,7 +666,7 @@ def test_user_visualization(username="MrPeanut02"):
 
     # Save visualizations
     print("\n6. Saving visualizations...")
-    visualizer.save_visualizations()
+    visualizer.save_visualizations(show_genres=show_genres)
 
     # Show plots
     print("\n7. Displaying plots...")
@@ -583,8 +680,12 @@ def test_user_visualization(username="MrPeanut02"):
 
 
 if __name__ == "__main__":
-    # Test with default user
-    visualizer = test_user_visualization("MrPeanut02")
+    # Test with default user and genre visualization
+    genres_to_show = ["Fantasy", "Action", "Romance"]  # Add/remove genres as needed
+    visualizer = test_user_visualization("MrPeanut02", show_genres=genres_to_show)
 
-    # You can also test with a different user:
-    # visualizer = test_user_visualization("YourUsername")
+    # You can also test without genres:
+    # visualizer = test_user_visualization("MrPeanut02")
+
+    # Or with different genres:
+    # visualizer = test_user_visualization("MrPeanut02", show_genres=["Drama", "Comedy", "Sci-Fi"])
