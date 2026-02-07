@@ -219,6 +219,6 @@ __marimo__/
 
 libs/
 /Resources/UserAnimeList.csv
-/Resources/UserAnimeList.parquet
-/Resources/UserList.csv
+/Dataset/UserAnimeList.parquet
+/Dataset/UserList.csv
 .DS_Store
