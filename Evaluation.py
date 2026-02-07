@@ -755,7 +755,7 @@ def analyze_sample_users(
 if __name__ == "__main__":
     try:
         # Generate recommendations with train/test split and metrics
-        # enerate_recommendations_safe()
+        # generate_recommendations_safe()
 
         # Evaluate aggregated results
         print("\n")
