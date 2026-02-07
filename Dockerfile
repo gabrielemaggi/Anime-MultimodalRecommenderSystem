@@ -1,15 +1,14 @@
 # Use an official lightweight Python image.
-FROM python:3.13
-
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Set the working directory
+FROM python:3.13-slim
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy requirements first to leverage Docker cache
-# (Ensure requirements.txt exists in the same directory as the Dockerfile)
 COPY requirements.txt .
 
 # Install dependencies
@@ -21,9 +20,14 @@ COPY . .
 # Expose the Streamlit port
 EXPOSE 8501
 
+# Debug: Show what files are actually in /app
+RUN echo "=== CONTENTS OF /app ===" && \
+    ls -la /app && \
+    echo "=== SEARCHING FOR main.py ===" && \
+    find /app -name "main.py" -o -name "*.py" | head -20
+
 # Healthcheck
 HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
 
 # Command to run the application
-# CHANGED: 'app/main.py' -> 'main.py' because the file is in the root of WORKDIR
 ENTRYPOINT ["streamlit", "run", "main.py", "--server.port=8501", "--server.address=0.0.0.0"]

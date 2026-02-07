@@ -143,10 +143,12 @@ def apply_filtering(
             genres=genres or [], studios=studios or []
         )
         embedding = None
+
         if genres and results.get("genres"):
             embedding = results.get("genres").get(genres[0])
         elif studios and results.get("studios"):
             embedding = results.get("studios").get(studios[0])
+
         if embedding is not None:
             query = indexer.align_embedding(embedding, modality="tab")
             user_obj.add_filtering(query, mode, magnitude)

@@ -9,7 +9,7 @@ services:
     volumes:
       # Mount the current directory to /app in the container
       # This allows for live code changes without rebuilding
-      - .:/app
+      # - .:/app
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
