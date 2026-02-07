@@ -17,9 +17,9 @@ RECOMMENDATIONS_FILE = "./Embeddings/recommendations_output.jsonl"
 ERROR_LOG = "./Embeddings/evaluation_errors.log"
 
 TRAIN_SPLIT = 0.8  # 80% train, 20% test
-TOP_K_RECOMMENDATIONS = 100
-EVAL_K = 50  # Evaluate Recall@50 and Hit@50
-MIN_ITEMS_FOR_SPLIT = 10  # Minimum items needed to create train/test split
+TOP_K_RECOMMENDATIONS = 20
+EVAL_K = 10  # Evaluate Recall@50 and Hit@50
+MIN_ITEMS_FOR_SPLIT = 20  # Minimum items needed to create train/test split
 MIN_TEST_SCORE = 6  # Only include test items with score >= 6
 
 CHUNK_SIZE = 1000
@@ -291,26 +291,52 @@ def calculate_shannon_entropy(recommendations):
     return -np.sum(probs * np.log2(probs))
 
 
-def calculate_novelty(recommendations):
-    """Average novelty across users"""
-    item_counts = Counter()
-    for rec_list in recommendations.values():
-        item_counts.update(rec_list)
+def calculate_novelty(recommendations, training_data):
+    """
+    Average novelty across users.
 
-    if not item_counts:
+    Novelty = average of (1 - popularity_score(i)) for recommended items
+    where popularity_score(i) = (# users who interacted with anime i) / (max popularity in catalog)
+
+    :param recommendations: Dict of {user_id: [recommended_anime_ids]}
+    :param training_data: DataFrame with columns ['user_id', 'anime_id'] - SUBSET of training data
+    :return: Average novelty score
+    """
+    try:
+        # Count how many USERS interacted with each anime in the training subset
+        item_user_counts = (
+            training_data.groupby("anime_id")["user_id"].nunique().to_dict()
+        )
+
+        if not item_user_counts:
+            return 0.0
+
+        # Get max popularity (most popular item)
+        max_popularity = max(item_user_counts.values())
+
+        # Calculate normalized popularity score for each item
+        # popularity_score(i) = (# users who interacted with i) / max_popularity
+        popularity_scores = {
+            item: count / max_popularity for item, count in item_user_counts.items()
+        }
+
+        # Calculate novelty for each user
+        user_novelties = []
+        for rec_list in recommendations.values():
+            if not rec_list:
+                continue
+
+            # For each recommended item, calculate (1 - popularity_score)
+            # Items not in training data have popularity_score = 0 (max novelty)
+            novelty_values = [1 - popularity_scores.get(item, 0) for item in rec_list]
+            user_novelty = np.mean(novelty_values)
+            user_novelties.append(user_novelty)
+
+        return np.mean(user_novelties) if user_novelties else 0.0
+
+    except Exception as e:
+        print(f"       Warning: Could not calculate novelty: {e}")
         return 0.0
-
-    max_count = max(item_counts.values())
-    popularity_scores = {item: count / max_count for item, count in item_counts.items()}
-
-    user_novelties = []
-    for rec_list in recommendations.values():
-        if not rec_list:
-            continue
-        novelty = np.mean([1 - popularity_scores.get(item, 0) for item in rec_list])
-        user_novelties.append(novelty)
-
-    return np.mean(user_novelties) if user_novelties else 0.0
 
 
 def evaluate_from_file():
@@ -322,6 +348,7 @@ def evaluate_from_file():
 
     Beyond-accuracy metrics (Coverage, Entropy, Novelty):
     - Use recommendations_from_full
+    - Only use training data from the SAME users in the recommendations file
     """
 
     print("\n" + "=" * 70)
@@ -334,13 +361,14 @@ def evaluate_from_file():
         print("Run: python script.py generate")
         return
 
-    print(f"\n[1/4] Loading data from file...")
+    print(f"\n[1/5] Loading data from file...")
 
     # Storage for metrics calculation
     recall_scores = []
     hit_scores = []
     recommendations_from_train = {}  # For accuracy metrics
     recommendations_from_full = {}  # For beyond-accuracy metrics
+    user_ids_in_file = []  # Track which users are in the file
 
     user_count = 0
 
@@ -350,6 +378,7 @@ def evaluate_from_file():
                 data = json.loads(line)
                 user_id = data["user_id"]
                 user_count += 1
+                user_ids_in_file.append(user_id)
 
                 # Extract data
                 test_anime_ids = [item[0] for item in data["test_watchlist"]]
@@ -374,13 +403,28 @@ def evaluate_from_file():
     print(f"       Loaded {user_count} users")
 
     # Calculate accuracy metrics
-    print(f"\n[2/4] Calculating accuracy metrics...")
+    print(f"\n[2/5] Calculating accuracy metrics...")
     print(f"       Using: recommendations_from_train vs test_watchlist")
     avg_recall = np.mean(recall_scores) if recall_scores else 0.0
     avg_hit = np.mean(hit_scores) if hit_scores else 0.0
 
-    # Load catalog for beyond-accuracy metrics
-    print(f"\n[3/4] Calculating beyond-accuracy metrics...")
+    # Load ONLY the training data for users in the recommendations file
+    print(f"\n[3/5] Loading training data for {len(user_ids_in_file)} users...")
+    print(f"       (for novelty calculation)")
+
+    try:
+        # Load only data for users present in recommendations file
+        df_train_subset = pd.read_parquet(
+            "./Dataset/UserAnimeList.parquet",
+            filters=[("user_id", "in", user_ids_in_file)],
+        )
+        print(f"       Loaded {len(df_train_subset)} interactions")
+    except Exception as e:
+        print(f"       Warning: Could not load training data subset: {e}")
+        df_train_subset = None
+
+    # Load catalog and calculate beyond-accuracy metrics
+    print(f"\n[4/5] Calculating beyond-accuracy metrics...")
     print(f"       Using: recommendations_from_full")
 
     try:
@@ -391,7 +435,14 @@ def evaluate_from_file():
             recommendations_from_full, full_catalog
         )
         shannon_entropy = calculate_shannon_entropy(recommendations_from_full)
-        novelty = calculate_novelty(recommendations_from_full)
+
+        # Calculate novelty using ONLY the subset of training data
+        if df_train_subset is not None:
+            novelty = calculate_novelty(
+                recommendations_from_full, training_data=df_train_subset
+            )
+        else:
+            novelty = 0.0
 
     except Exception as e:
         print(f"       Warning: Could not calculate beyond-accuracy metrics: {e}")
@@ -399,7 +450,7 @@ def evaluate_from_file():
         full_catalog = set()
 
     # Display results
-    print(f"\n[4/4] Results:")
+    print(f"\n[5/5] Results:")
     print("\n" + "=" * 70)
     print("📊 EVALUATION RESULTS")
     print("=" * 70)
@@ -414,6 +465,7 @@ def evaluate_from_file():
     print(f"   Source: recommendations_from_full")
     print(f"   Users:           {len(recommendations_from_full)}")
     print(f"   Catalog size:    {len(full_catalog)}")
+    print(f"   Training data:   {len(user_ids_in_file)} users only")
     print(
         f"   Catalog Coverage: {catalog_coverage:.4f} ({catalog_coverage * 100:.2f}%)"
     )
