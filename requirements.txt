@@ -6,3 +6,6 @@ transformers
 node2vec
 pyarrow>=7.0,<22
 streamlit
+faiss-cpu
+mal-api.py
+malclient-upgraded
