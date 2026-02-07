@@ -16,7 +16,7 @@ class RecommenderEvaluator:
     """
     A specialized evaluation class for Recommendation Systems.
     Focuses on beyond-accuracy metrics: Catalog Coverage, Distributional Coverage (Entropy)
-    and Novelty, plus accuracy metrics: Precision@k and Recall@k.
+    and Novelty, plus accuracy metrics: Recall@k and Hit@k.
     """
 
     def __init__(self, train_df, catalog_items):
@@ -44,8 +44,8 @@ class RecommenderEvaluator:
         """
         Run the evaluation on a set of generated recommendations.
         :param rec_dict: Dictionary {user_id: [list_of_recommended_items]}
-        :param ground_truth_dict: Dictionary {user_id: [list_of_relevant_items]} for Precision/Recall
-        :param k: Number of top recommendations to consider for Precision@k and Recall@k
+        :param ground_truth_dict: Dictionary {user_id: [list_of_relevant_items]} for Recall/Hit
+        :param k: Number of top recommendations to consider for Recall@k and Hit@k
         :return: Dictionary containing all computed metrics
         """
 
@@ -62,12 +62,12 @@ class RecommenderEvaluator:
             "novelty_score": self._calculate_novelty(rec_dict),
         }
 
-        # Add Precision@k and Recall@k if ground truth is provided
+        # Add Recall@k and Hit@k if ground truth is provided
         if ground_truth_dict is not None:
-            metrics[f"precision@{k}"] = self._calculate_precision_at_k(
+            metrics[f"recall@{k}"] = self._calculate_recall_at_k(
                 rec_dict, ground_truth_dict, k
             )
-            metrics[f"recall@{k}"] = self._calculate_recall_at_k(
+            metrics[f"hit@{k}"] = self._calculate_hit_at_k(
                 rec_dict, ground_truth_dict, k
             )
 
@@ -145,19 +145,19 @@ class RecommenderEvaluator:
         # Return the average novelty across all users
         return np.mean(user_novelty_scores) if user_novelty_scores else 0.0
 
-    def _calculate_precision_at_k(self, rec_dict, ground_truth_dict, k):
+    def _calculate_hit_at_k(self, rec_dict, ground_truth_dict, k):
         """
-        Calculates Precision@k: the proportion of recommended items in the top-k set
-        that are relevant to the user.
+        Calculates Hit@k: the proportion of users for whom at least one relevant item
+        appears in the top-k recommendations.
 
-        Precision@k = (Number of relevant items in top-k) / k
+        Hit@k = 1 if at least one relevant item is in top-k, 0 otherwise
 
         :param rec_dict: Dictionary {user_id: [list_of_recommended_items]}
         :param ground_truth_dict: Dictionary {user_id: [list_of_relevant_items]}
         :param k: Number of top recommendations to consider
-        :return: Average Precision@k across all users
+        :return: Average Hit@k across all users (proportion of successful recommendations)
         """
-        precision_scores = []
+        hit_scores = []
 
         for user_id, rec_list in rec_dict.items():
             # Get ground truth (relevant items) for this user
@@ -169,15 +169,12 @@ class RecommenderEvaluator:
             # Consider only top-k recommendations
             top_k_recs = set(rec_list[:k])
 
-            # Count how many recommended items are relevant
-            relevant_in_top_k = len(top_k_recs.intersection(relevant_items))
+            # Check if at least one recommended item is relevant
+            hit = 1.0 if len(top_k_recs.intersection(relevant_items)) > 0 else 0.0
+            hit_scores.append(hit)
 
-            # Precision@k = relevant_in_top_k / k
-            precision = relevant_in_top_k / k if k > 0 else 0.0
-            precision_scores.append(precision)
-
-        # Return average precision across all users
-        return np.mean(precision_scores) if precision_scores else 0.0
+        # Return average hit rate across all users
+        return np.mean(hit_scores) if hit_scores else 0.0
 
     def _calculate_recall_at_k(self, rec_dict, ground_truth_dict, k):
         """
@@ -223,6 +220,7 @@ from contextlib import contextmanager
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+
 from Libs.indexing_db import Indexing
 
 # Assumendo che questi siano già importati nel tuo progetto
@@ -234,9 +232,10 @@ OUTPUT_FILE = "./Embeddings/attention_recs_output_with_metrics.jsonl"
 ERROR_LOG = "./Embeddings/attention_processing_errors.log"
 CHUNK_SIZE = 1000  # Smaller chunks for safety
 GC_FREQUENCY = 100  # Garbage collect every N users
-TOP_K = 10  # Number of recommendations to generate
-EVAL_K = 10  # K for Precision@k and Recall@k evaluation
-TRAIN_SPLIT = 0.8  # 50% for training, 50% for testing
+TOP_K = 100  # Number of recommendations to generate
+EVAL_K = 50  # K for Recall@k and Hit@k evaluation
+TEST_SET_DIM = 10
+TRAIN_SPLIT = 0.8  # 80% for training, 20% for testing
 
 
 @contextmanager
@@ -330,23 +329,23 @@ def split_watchlist(watchlist, train_ratio=0.5, min_items=5):
     # opzionale riordinare test
     test_list.sort(key=lambda x: x[1], reverse=True)
 
-    if len(test_list) < EVAL_K:
+    if len(test_list) < TEST_SET_DIM:
         return train_list, []
 
-    return train_list, test_list[:EVAL_K]
+    return train_list, test_list[:TEST_SET_DIM]
 
 
 def calculate_user_metrics(recommendations, ground_truth, k=10):
     """
-    Calculate Precision@k and Recall@k for a single user.
+    Calculate Recall@k and Hit@k for a single user.
 
     :param recommendations: List of recommended anime IDs
     :param ground_truth: List of relevant anime IDs (test set)
     :param k: Number of top recommendations to consider
-    :return: Dictionary with precision and recall
+    :return: Dictionary with recall and hit
     """
     if not ground_truth or not recommendations:
-        return {"precision": 0.0, "recall": 0.0}
+        return {"recall": 0.0, "hit": 0.0}
 
     # Consider only top-k recommendations
     top_k_recs = set(recommendations[:k])
@@ -355,10 +354,10 @@ def calculate_user_metrics(recommendations, ground_truth, k=10):
     # Calculate metrics
     relevant_in_top_k = len(top_k_recs.intersection(relevant_items))
 
-    precision = relevant_in_top_k / k if k > 0 else 0.0
     recall = relevant_in_top_k / len(relevant_items) if len(relevant_items) > 0 else 0.0
+    hit = 1.0 if relevant_in_top_k > 0 else 0.0
 
-    return {"precision": precision, "recall": recall}
+    return {"recall": recall, "hit": hit}
 
 
 def process_single_user(
@@ -408,7 +407,7 @@ def process_single_user(
         # Extract test set anime IDs (ground truth)
         test_anime_ids = [int(item[0]) for item in test_watchlist]
 
-        # Calculate Precision@k and Recall@k
+        # Calculate Recall@k and Hit@k
         metrics = calculate_user_metrics(rec_ids, test_anime_ids, k=eval_k)
 
         # Prepare result
@@ -421,8 +420,8 @@ def process_single_user(
                 [int(item[0]), float(item[1])] for item in test_watchlist
             ],
             "recommendations": rec_ids,
-            f"precision@{eval_k}": metrics["precision"],
             f"recall@{eval_k}": metrics["recall"],
+            f"hit@{eval_k}": metrics["hit"],
         }
 
         # Cleanup
@@ -492,8 +491,8 @@ def generate_recommendations_safe():
     skipped_count = 0  # Users with too few items for split
 
     # Metrics aggregation
-    total_precision = 0.0
     total_recall = 0.0
+    total_hit = 0.0
 
     with open(OUTPUT_FILE, "a", buffering=1) as f_out:  # Line buffering
         for chunk_idx in range(total_chunks):
@@ -564,8 +563,8 @@ def generate_recommendations_safe():
                                 successful_count += 1
 
                                 # Accumulate metrics
-                                total_precision += result[f"precision@{EVAL_K}"]
                                 total_recall += result[f"recall@{EVAL_K}"]
+                                total_hit += result[f"hit@{EVAL_K}"]
                             else:
                                 skipped_count += 1
 
@@ -585,21 +584,19 @@ def generate_recommendations_safe():
                     pbar.close()
 
                     # Update progress
-                    avg_precision = (
-                        total_precision / successful_count
-                        if successful_count > 0
-                        else 0
-                    )
                     avg_recall = (
                         total_recall / successful_count if successful_count > 0 else 0
+                    )
+                    avg_hit = (
+                        total_hit / successful_count if successful_count > 0 else 0
                     )
                     print(
                         f"     Batch completed - Successes: {successful_count}, "
                         f"Errors: {error_count}, Skipped: {skipped_count}"
                     )
                     print(
-                        f"     Running Avg - Precision@{EVAL_K}: {avg_precision:.4f}, "
-                        f"Recall@{EVAL_K}: {avg_recall:.4f}"
+                        f"     Running Avg - Recall@{EVAL_K}: {avg_recall:.4f}, "
+                        f"Hit@{EVAL_K}: {avg_hit:.4f}"
                     )
 
             except Exception as e:
@@ -617,11 +614,11 @@ def generate_recommendations_safe():
     print(f"⊘ Skipped (too few items): {skipped_count}")
 
     if successful_count > 0:
-        avg_precision = total_precision / successful_count
         avg_recall = total_recall / successful_count
+        avg_hit = total_hit / successful_count
         print(f"\n📊 AVERAGE METRICS:")
-        print(f"   Precision@{EVAL_K}: {avg_precision:.4f}")
         print(f"   Recall@{EVAL_K}: {avg_recall:.4f}")
+        print(f"   Hit@{EVAL_K}: {avg_hit:.4f} ({avg_hit * 100:.2f}%)")
 
     print(f"\n💾 Data saved in: {OUTPUT_FILE}")
     if error_count > 0:
@@ -641,8 +638,8 @@ def evaluate_from_file(
     print("\n[1/2] Reading recommendations and metrics...")
     all_recommendations = {}
     all_ground_truths = {}
-    precision_scores = []
     recall_scores = []
+    hit_scores = []
 
     try:
         with open(recs_file, "r") as f:
@@ -657,15 +654,13 @@ def evaluate_from_file(
                     ]
 
                     # Extract individual metrics
-                    precision_key = [
-                        k for k in data.keys() if k.startswith("precision@")
-                    ]
                     recall_key = [k for k in data.keys() if k.startswith("recall@")]
+                    hit_key = [k for k in data.keys() if k.startswith("hit@")]
 
-                    if precision_key:
-                        precision_scores.append(data[precision_key[0]])
                     if recall_key:
                         recall_scores.append(data[recall_key[0]])
+                    if hit_key:
+                        hit_scores.append(data[hit_key[0]])
 
                 except Exception as e:
                     continue
@@ -683,8 +678,8 @@ def evaluate_from_file(
     print("\n[2/2] Calculating aggregated metrics...")
 
     # Calculate average accuracy metrics
-    avg_precision = np.mean(precision_scores) if precision_scores else 0.0
     avg_recall = np.mean(recall_scores) if recall_scores else 0.0
+    avg_hit = np.mean(hit_scores) if hit_scores else 0.0
 
     # Calculate beyond-accuracy metrics using the evaluator
     print("       Loading dataset for beyond-accuracy metrics...")
@@ -709,10 +704,8 @@ def evaluate_from_file(
     print("=" * 60)
 
     print("\n🎯 ACCURACY METRICS (per-user average):")
-    print(
-        f"   Precision@{EVAL_K}:        {avg_precision:.4f} ({avg_precision * 100:.2f}%)"
-    )
     print(f"   Recall@{EVAL_K}:           {avg_recall:.4f} ({avg_recall * 100:.2f}%)")
+    print(f"   Hit@{EVAL_K}:              {avg_hit:.4f} ({avg_hit * 100:.2f}%)")
 
     if beyond_metrics:
         print("\n🌟 BEYOND-ACCURACY METRICS:")
@@ -745,17 +738,15 @@ def analyze_sample_users(
                 data = json.loads(line)
                 user_id = data["user_id"]
 
-                precision_key = [k for k in data.keys() if k.startswith("precision@")][
-                    0
-                ]
                 recall_key = [k for k in data.keys() if k.startswith("recall@")][0]
+                hit_key = [k for k in data.keys() if k.startswith("hit@")][0]
 
                 print(f"\n👤 User ID: {user_id}")
                 print(f"   Train Set Size: {len(data['watchlist_train'])} anime")
                 print(f"   Test Set Size: {len(data['watchlist_test'])} anime")
                 print(f"   Recommendations: {len(data['recommendations'])} anime")
-                print(f"   {precision_key}: {data[precision_key]:.4f}")
                 print(f"   {recall_key}: {data[recall_key]:.4f}")
+                print(f"   {hit_key}: {data[hit_key]:.4f}")
 
     except Exception as e:
         print(f"Error: {e}")
@@ -764,7 +755,7 @@ def analyze_sample_users(
 if __name__ == "__main__":
     try:
         # Generate recommendations with train/test split and metrics
-        generate_recommendations_safe()
+        # enerate_recommendations_safe()
 
         # Evaluate aggregated results
         print("\n")
