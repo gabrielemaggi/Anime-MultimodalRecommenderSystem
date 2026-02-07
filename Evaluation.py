@@ -432,7 +432,7 @@ def evaluate_from_file(recs_file="./Embeddings/attention_recs_output.jsonl"):
 
 if __name__ == "__main__":
     try:
-        generate_recommendations_safe()
+        # generate_recommendations_safe()
 
         # Uncomment to run evaluation after generation
         # print("\n")
