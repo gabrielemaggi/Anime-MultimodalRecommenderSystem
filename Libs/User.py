@@ -99,11 +99,16 @@ class User:
         """
         Find nearest anime across all cluster centers and return a total of top_k unique, unwatched IDs
         """
+        # 4. Simple Hybrid Re-ranking
+        # This blends your User-Match (Similarity) with Global Popularity
+        alpha = 0.6  # Weight for Similarity (0.0 to 1.0)
+        beta = 0.4  # Weight for Popularity (0.0 to 1.0)
+        search_k = top_k * 5  # Big for exploring more nearest anime
+
         if not hasattr(self, "embeddings"):
             self.findCentersOfClusters()
 
         all_anime_entries = []
-
         n_cluster = len(self.embeddings)
 
         if top_k < n_cluster:
@@ -114,20 +119,17 @@ class User:
         # 1. Gather candidates
         for center_embedding in self.embeddings:
             nearest_entries = vector_db.search(
-                query_embedding=center_embedding, top_k=k
+                query_embedding=center_embedding, top_k=search_k
             )
             all_anime_entries.extend(nearest_entries)
 
         # 2. PRE-PROCESS WATCHED IDS
         watched_ids = {str(item[0]) for item in self.watched}
-
-        # 3. Filter duplicates and watched items
         seen_ids = set()
         unique_anime_entries = []
 
         for anime_data in all_anime_entries:
             current_id = str(anime_data.get("id"))
-
             if current_id not in seen_ids and current_id not in watched_ids:
                 seen_ids.add(current_id)
                 unique_anime_entries.append(anime_data)
@@ -136,7 +138,28 @@ class User:
         # Sort the combined pool by similarity score
         unique_anime_entries.sort(key=lambda x: x.get("similarity", 0), reverse=True)
 
-        # Return exactly the total amount requested (or fewer if not enough found)
+        # Reranking by popularity
+        for entry in unique_anime_entries:
+            # 1. Get Similarity (Personal Match)
+            sim_score = float(entry.get("similarity", 0))
+            # 2. Get Global Popularity Score
+            # We normalize the MAL score (0-10) to a 0-1 range
+            global_score = float(entry.get("score", 0)) / 10.0
+            # 3. Apply 'scored_by' boost (Confidence)
+            # We use log10 to ensure a 1M-voter anime doesn't ruin a 10k-voter anime.
+            # This handles your "0 is not bad" rule: if votes=0, log factor is 0.
+            votes = int(entry.get("scored_by", 0))
+            popularity_factor = (
+                np.log10(votes + 1) / 7.0
+            )  # Normalized by max log (approx 10M)
+            # Combine global score with popularity weight
+            # If score is 0, it contributes 0 but isn't "penalized"
+            weighted_pop = (global_score * 0.8) + (popularity_factor * 0.2)
+            # 4. Final Blend
+            entry["final_score"] = (alpha * sim_score) + (beta * weighted_pop)
+
+        # Sort by the final blended score
+        unique_anime_entries.sort(key=lambda x: x.get("final_score", 0), reverse=True)
         return unique_anime_entries[:top_k]
 
     def debug_plot_watchlist(self):

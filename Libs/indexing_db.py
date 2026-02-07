@@ -35,7 +35,17 @@ class Indexing:
         self.anime_db_metadata = "./Embeddings/Attention_AnimeVecDb.pkl"
         self.fusion_model = "./Embeddings/fusion_model_attention_is_what_you_need.pt"
         # Metadata columns to store
-        self.AM = ["title", "title_english", "title_japanese", "genre", "sypnopsis"]
+        self.AM = [
+            "title",
+            "title_english",
+            "title_japanese",
+            "genre",
+            "sypnopsis",
+            "rating",
+            "score",
+            "scored_by",
+            "popularity",
+        ]
 
         # Vector database
         self.vector_db = None
