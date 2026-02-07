@@ -1,0 +1,90 @@
+{
+  "qwen2.5:14b": {
+    "total_evaluations": 8,
+    "successful_evaluations": 8,
+    "errors": 0,
+    "score_mean": 3.625,
+    "score_std": 0.4841229182759271,
+    "score_min": 3.0,
+    "score_max": 4.0,
+    "score_median": 4.0,
+    "genre_goal_score_mean": 3.5,
+    "genre_goal_score_std": 0.9574271077563381,
+    "all_scores": [
+      4,
+      4,
+      3,
+      4,
+      3,
+      3,
+      4,
+      4
+    ],
+    "all_genre_goal_scores": [
+      4,
+      5,
+      3,
+      3,
+      2,
+      4
+    ]
+  },
+  "gemma3:latest": {
+    "total_evaluations": 8,
+    "successful_evaluations": 7,
+    "errors": 0,
+    "score_mean": 4.0,
+    "score_std": 0.0,
+    "score_min": 4.0,
+    "score_max": 4.0,
+    "score_median": 4.0,
+    "genre_goal_score_mean": 5.0,
+    "genre_goal_score_std": 0.0,
+    "all_scores": [
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4
+    ],
+    "all_genre_goal_scores": [
+      5,
+      5,
+      5,
+      5,
+      5
+    ]
+  },
+  "qwen3:30b-a3b": {
+    "total_evaluations": 8,
+    "successful_evaluations": 8,
+    "errors": 0,
+    "score_mean": 4.375,
+    "score_std": 0.8569568250501305,
+    "score_min": 3.0,
+    "score_max": 5.0,
+    "score_median": 5.0,
+    "genre_goal_score_mean": 4.333333333333333,
+    "genre_goal_score_std": 1.1055415967851332,
+    "all_scores": [
+      5,
+      5,
+      4,
+      5,
+      3,
+      5,
+      5,
+      3
+    ],
+    "all_genre_goal_scores": [
+      5,
+      5,
+      4,
+      2,
+      5,
+      5
+    ]
+  }
+}
