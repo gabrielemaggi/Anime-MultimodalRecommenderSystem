@@ -3,6 +3,7 @@ import pandas as pd
 from mal import client
 from sympy.codegen.ast import Raise
 
+from Libs.AnimeDBManager import *
 from Libs.clusterFinder import clusterFinder
 from Libs.indexing_db import *
 from Libs.UserDBConnector import UserDBConnector
@@ -40,6 +41,7 @@ class User:
         else:
             API_ID = "d79a8a3b8f42750e317b0b7abc47adf2"
             api = client.Client(API_ID)
+            self.manager = AnimeDBManager(API_ID)
 
             if isinstance(id, int):
                 raise ValueError("User ID must be a String")
@@ -67,6 +69,7 @@ class User:
                     watched.append([anime_id, score])
                 else:
                     print(f"Warning: {title_mal} do not find in the anime database.")
+                    # self.manager.add_anime_by_search(title_mal) # Missing Node2Vec new insertion
 
             self.watched = watched
             self.watch_anime_info = watched
