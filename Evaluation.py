@@ -222,8 +222,8 @@ from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
-from recommender_evaluator import RecommenderEvaluator
 from tqdm import tqdm
+from Libs.indexing_db import Indexing
 
 # Assumendo che questi siano già importati nel tuo progetto
 # from your_module import User, Indexing
