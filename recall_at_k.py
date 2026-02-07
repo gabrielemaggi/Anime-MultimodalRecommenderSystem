@@ -83,8 +83,7 @@ class precision_recall_at_k:
         return self.precision_recall_df
 
 
-
-        #calculate recall at k for a row
+#calculate recall at k for a row
     def _calculate_precision_recall_at_k(self, last_watched, predictions , similarity_param  ):
         # if(last_watched ==None or predictions == None):
         #     raise ValueError("last_watched or predictions cannot be None")
