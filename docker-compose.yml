@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  streamlit-app:
+    build: .
+    container_name: recommender-ia
+    ports:
+      - "8501:8501"
+    volumes:
+      # Mount the current directory to /app in the container
+      # This allows for live code changes without rebuilding
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

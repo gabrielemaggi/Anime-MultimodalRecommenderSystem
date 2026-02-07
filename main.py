@@ -28,11 +28,19 @@ st.markdown(
         display: flex;
         flex-direction: column;
     }
-    /* Fixed height for images to prevent vertical jumping */
+    /* Responsive images with fixed aspect ratio */
     .stImage img {
-        height: 250px;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 2/3;
         object-fit: cover;
         border-radius: 5px;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .stImage img:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
 </style>
 """,
@@ -480,10 +488,10 @@ if st.session_state.logged_in_user is not None:
                             with st.container(border=True):
                                 img = find_anime_image(anime_id)
 
-                                # Clickable image with expander for details
+                                # Clickable image - clicking toggles details
                                 if st.button(
-                                    "🔍",
-                                    key=f"view_{anime_id}_{idx}",
+                                    "Click to view details",
+                                    key=f"img_btn_{anime_id}_{idx}",
                                     use_container_width=True,
                                 ):
                                     st.session_state[
@@ -697,13 +705,12 @@ if st.session_state.logged_in_user is not None:
                         item = clean_history[idx]
                         with cols[j]:
                             with st.container(border=True):
-                                # Immagine con altezza fissa (gestita dal CSS sopra)
                                 img = find_anime_image(str(item["id"]))
 
                                 # Clickable button for details
                                 if st.button(
-                                    "🔍",
-                                    key=f"history_view_{item['id']}_{idx}",
+                                    "Click to view details",
+                                    key=f"history_img_btn_{item['id']}_{idx}",
                                     use_container_width=True,
                                 ):
                                     st.session_state[
@@ -720,8 +727,6 @@ if st.session_state.logged_in_user is not None:
                                     use_container_width=True,
                                 )
 
-                                # Wrapper a dimensione fissa per Titolo e Rating
-                                # Usiamo 80px come nelle recommendations per coerenza
                                 rating_val = item["rating"]
                                 rating_display = (
                                     f"⭐ {rating_val}/10"

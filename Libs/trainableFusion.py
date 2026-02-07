@@ -5,11 +5,173 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+# from Augumentations import *
 from torch.utils.data import DataLoader, Dataset
 
 
 class CoMMFusion(nn.Module):
-    def __init__(self, syn_dim, vis_dim, tab_dim, output_dim=128):
+    def __init__(
+        self, syn_dim, vis_dim, tab_dim, output_dim=384, nhead=8, num_layers=2
+    ):
+        super().__init__()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.output_dim = output_dim
+
+        # --- 1. Specialized Encoders ---
+        # Projects raw features into a common embedding space (d_model)
+        self.enc_syn = nn.Sequential(
+            nn.Linear(syn_dim, output_dim),
+            nn.LayerNorm(output_dim),
+            nn.ReLU(),
+            nn.Linear(output_dim, output_dim),
+        )
+        self.enc_vis = nn.Sequential(
+            nn.Linear(vis_dim, output_dim),
+            nn.LayerNorm(output_dim),
+            nn.ReLU(),
+            nn.Linear(output_dim, output_dim),
+        )
+        self.enc_tab = nn.Sequential(
+            nn.Linear(tab_dim, output_dim),
+            nn.LayerNorm(output_dim),
+            nn.ReLU(),
+            nn.Linear(output_dim, output_dim),
+        )
+
+        # --- 2. Learnable Fusion Token ---
+        # A shared "CLS" token that will aggregate information from all modalities
+        self.fusion_token = nn.Parameter(torch.randn(1, 1, output_dim))
+
+        # --- 3. Attention-Based Fusion Module ---
+        # Standard Transformer Encoder Layer
+        # batch_first=True expects input shape: (Batch, Seq_Len, Dim)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=output_dim, nhead=nhead, batch_first=True
+        )
+        self.fusion_transformer = nn.TransformerEncoder(
+            encoder_layer, num_layers=num_layers
+        )
+
+        # --- Logit Scale (Temperature) for Contrastive Loss ---
+        self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.2))
+
+    def forward(self, syn, vis, tab, return_centroid=False):
+        batch_size = syn.shape[0]
+
+        is_unbatched = syn.dim() == 1
+        if is_unbatched:
+            syn = syn.unsqueeze(0)
+            vis = vis.unsqueeze(0)
+            tab = tab.unsqueeze(0)
+
+        batch_size = syn.shape[0]
+        # 1. Encode Individual Modalities
+        # Shape: (Batch, output_dim)
+        h_s = self.enc_syn(syn)
+        h_v = self.enc_vis(vis)
+        h_t = self.enc_tab(tab)
+
+        # Normalize them for the individual alignment loss later (optional but recommended)
+        z_s = F.normalize(h_s, p=2, dim=-1)
+        z_v = F.normalize(h_v, p=2, dim=-1)
+        z_t = F.normalize(h_t, p=2, dim=-1)
+
+        # 2. Prepare Sequence for Transformer
+        # Stack modalities to create a sequence: [Syn, Vis, Tab]
+        # Shape: (Batch, 3, output_dim)
+        modality_tokens = torch.stack([h_s, h_v, h_t], dim=1)
+
+        # Expand fusion token to batch size
+        # Shape: (Batch, 1, output_dim)
+        fusion_token_expanded = self.fusion_token.expand(batch_size, -1, -1)
+
+        # Concatenate: [Fusion_Token, Syn, Vis, Tab]
+        # Final Shape: (Batch, 4, output_dim)
+        transformer_input = torch.cat((fusion_token_expanded, modality_tokens), dim=1)
+
+        # 3. Apply Attention-Based Fusion
+        # The transformer allows every token to attend to every other token.
+        transformer_output = self.fusion_transformer(transformer_input)
+
+        fused_embedding = transformer_output[:, 0, :]
+        centroid = F.normalize(fused_embedding, p=2, dim=-1)
+
+        # If input was unbatched, squeeze output back to 1D to avoid breaking downstream code
+        if is_unbatched:
+            centroid = centroid.squeeze(0)
+            if return_centroid:
+                return z_s.squeeze(0), z_v.squeeze(0), z_t.squeeze(0), centroid
+
+        if return_centroid:
+            # Return individual normalized embeddings and the fused centroid
+            return z_s, z_v, z_t, centroid
+
+        return centroid
+
+    def comm_loss(self, z_s, z_v, z_t, centroid):
+        """
+        CoMM Alignment Loss with both centroid alignment and pairwise modality alignment.
+        """
+        batch_size = z_s.size(0)
+        labels = torch.arange(batch_size, device=z_s.device)
+        logit_scale = self.logit_scale.exp().clamp(max=100)
+
+        # ========== 1. Modality ↔ Centroid Alignment ==========
+        # Forward direction (modality → centroid)
+        logits_s = torch.matmul(z_s, centroid.T) * logit_scale
+        logits_v = torch.matmul(z_v, centroid.T) * logit_scale
+        logits_t = torch.matmul(z_t, centroid.T) * logit_scale
+
+        # Backward direction (centroid → modality)
+        logits_s_t = torch.matmul(centroid, z_s.T) * logit_scale
+        logits_v_t = torch.matmul(centroid, z_v.T) * logit_scale
+        logits_t_t = torch.matmul(centroid, z_t.T) * logit_scale
+
+        loss_s_centroid = (
+            F.cross_entropy(logits_s, labels) + F.cross_entropy(logits_s_t, labels)
+        ) / 2
+        loss_v_centroid = (
+            F.cross_entropy(logits_v, labels) + F.cross_entropy(logits_v_t, labels)
+        ) / 2
+        loss_t_centroid = (
+            F.cross_entropy(logits_t, labels) + F.cross_entropy(logits_t_t, labels)
+        ) / 2
+
+        # ========== 2. Pairwise Modality ↔ Modality Alignment ==========
+        # Syn ↔ Vis
+        logits_sv = torch.matmul(z_s, z_v.T) * logit_scale
+        loss_sv = (
+            F.cross_entropy(logits_sv, labels) + F.cross_entropy(logits_sv.T, labels)
+        ) / 2
+
+        # Syn ↔ Tab
+        logits_st = torch.matmul(z_s, z_t.T) * logit_scale
+        loss_st = (
+            F.cross_entropy(logits_st, labels) + F.cross_entropy(logits_st.T, labels)
+        ) / 2
+
+        # Vis ↔ Tab
+        logits_vt = torch.matmul(z_v, z_t.T) * logit_scale
+        loss_vt = (
+            F.cross_entropy(logits_vt, labels) + F.cross_entropy(logits_vt.T, labels)
+        ) / 2
+
+        # ========== 3. Combine All Losses ==========
+        # Average centroid losses
+        centroid_loss = (loss_s_centroid + loss_v_centroid + loss_t_centroid) / 3
+
+        # Average pairwise losses
+        pairwise_loss = (loss_sv + loss_st + loss_vt) / 3
+
+        # Combine with equal weighting (you can adjust the α parameter)
+        total_loss = centroid_loss + pairwise_loss
+
+        return total_loss
+
+
+class CoMMFusion_2(nn.Module):
+    def __init__(self, syn_dim, vis_dim, tab_dim, output_dim=384):
         super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # --- Encoders ---
@@ -92,17 +254,20 @@ class FusionTrainer:
         vis_embs=None,
         tab_embs=None,
         output_dim=384,
-        load_model=False,
+        load_model=False,  # Add this parameter
     ):
-
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.save_path = "./Embeddings/fusion_model.pt"
+        self.save_path = "./Embeddings/fusion_model_attention_is_what_you_need.pt"
 
-        # Handle load_model case (model-only initialization)
-        if load_model:
-            self.model = CoMMFusion(384, 384, 384, 384)
+        # If model exists OR load_model=True, load it
+        if os.path.exists(self.save_path) or load_model:
+            if not os.path.exists(self.save_path):
+                raise FileNotFoundError(f"Model file not found at {self.save_path}")
+
+            self.model = CoMMFusion(384, 384, 384, output_dim, nhead=4, num_layers=1)
             self.model = self.load(self.save_path, self.device)
-            # Initialize embeddings as None - they can be set later if needed
+
+            # Set embeddings to None (not needed for inference)
             self.syn_embs = syn_embs.astype("float32") if syn_embs is not None else None
             self.vis_embs = vis_embs.astype("float32") if vis_embs is not None else None
             self.tab_embs = tab_embs.astype("float32") if tab_embs is not None else None
@@ -121,49 +286,13 @@ class FusionTrainer:
             self.item_ids = item_ids
 
             self.model = CoMMFusion(
-                syn_embs.shape[1], vis_embs.shape[1], tab_embs.shape[1], output_dim
+                syn_embs.shape[1],
+                vis_embs.shape[1],
+                tab_embs.shape[1],
+                output_dim,
+                nhead=4,
+                num_layers=1,
             ).to(self.device)
-
-    def train_2(self, epochs=50, batch_size=128):
-        if os.path.exists(self.save_path):
-            self.load(self.save_path)
-            return self.model
-
-        optimizer = torch.optim.AdamW(
-            self.model.parameters(), lr=1e-4, weight_decay=1e-2
-        )
-        loader = DataLoader(
-            TensorDataset(self.syn_embs, self.vis_embs, self.tab_embs),
-            batch_size=batch_size,
-            shuffle=True,
-        )
-
-        for epoch in range(epochs):
-            self.model.train()
-            total_loss = 0
-            for syn, vis, tab in loader:
-                syn, vis, tab = (
-                    syn.to(self.device),
-                    vis.to(self.device),
-                    tab.to(self.device),
-                )
-
-                # Get individual views and the shared centroid
-                z_s, z_v, z_t, centroid = self.model(
-                    syn, vis, tab, return_centroid=True
-                )
-
-                # Calculate CoMM loss
-                loss = self.model.comm_loss(z_s, z_v, z_t, centroid)
-
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                total_loss += loss.item()
-
-            print(f"Epoch {epoch + 1} | CoMM Loss: {total_loss / len(loader):.4f}")
-
-        self.save(self.save_path)
 
     def train(self, epochs=500, batch_size=2048, patience=15, min_delta=1e-4):
         if os.path.exists(self.save_path):
@@ -171,16 +300,13 @@ class FusionTrainer:
             return self.model
 
         optimizer = torch.optim.AdamW(
-            self.model.parameters(), lr=1e-4, weight_decay=1e-2
+            self.model.parameters(), lr=5e-4, weight_decay=1e-2
         )
 
-        # --- Early Stopping Setup ---
         best_loss = float("inf")
         epochs_no_improve = 0
         best_model_wts = copy.deepcopy(self.model.state_dict())
 
-        # Note: Ideally, use a separate validation loader here.
-        # For this example, we will monitor the training loss trend.
         loader = DataLoader(
             TensorDataset(self.syn_embs, self.vis_embs, self.tab_embs),
             batch_size=batch_size,
@@ -190,6 +316,9 @@ class FusionTrainer:
         for epoch in range(epochs):
             self.model.train()
             total_loss = 0
+
+            # Track cosine similarities for monitoring
+            epoch_sims_sv, epoch_sims_st, epoch_sims_vt = [], [], []
 
             for syn, vis, tab in loader:
                 syn, vis, tab = (
@@ -208,10 +337,30 @@ class FusionTrainer:
                 optimizer.step()
                 total_loss += loss.item()
 
-            avg_loss = total_loss / len(loader)
-            print(f"Epoch {epoch + 1} | CoMM Loss: {avg_loss:.4f}")
+                # Track similarities (detached from graph)
+                with torch.no_grad():
+                    epoch_sims_sv.append(
+                        F.cosine_similarity(z_s, z_v, dim=1).mean().item()
+                    )
+                    epoch_sims_st.append(
+                        F.cosine_similarity(z_s, z_t, dim=1).mean().item()
+                    )
+                    epoch_sims_vt.append(
+                        F.cosine_similarity(z_v, z_t, dim=1).mean().item()
+                    )
 
-            # --- Early Stopping Logic ---
+            avg_loss = total_loss / len(loader)
+            avg_sim_sv = np.mean(epoch_sims_sv)
+            avg_sim_st = np.mean(epoch_sims_st)
+            avg_sim_vt = np.mean(epoch_sims_vt)
+
+            print(f"Epoch {epoch + 1}/{epochs} | Loss: {avg_loss:.4f}")
+            print(
+                f"  Similarities → Syn-Vis: {avg_sim_sv:.4f} | Syn-Tab: {avg_sim_st:.4f} | Vis-Tab: {avg_sim_vt:.4f}"
+            )
+            print(f"  Temperature: {1 / self.model.logit_scale.exp().item():.4f}")
+
+            # Early Stopping
             if avg_loss < best_loss - min_delta:
                 best_loss = avg_loss
                 best_model_wts = copy.deepcopy(self.model.state_dict())
@@ -220,11 +369,11 @@ class FusionTrainer:
                 epochs_no_improve += 1
                 if epochs_no_improve >= patience:
                     print(f"Early stopping triggered at epoch {epoch + 1}")
-                    # Load the best weights before exiting
                     self.model.load_state_dict(best_model_wts)
                     break
 
         self.save(self.save_path)
+        return self.model
 
     def transform(
         self, syn_embs=None, vis_embs=None, tab_embs=None, as_list: bool = False
@@ -282,10 +431,8 @@ class FusionTrainer:
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         checkpoint = torch.load(path, map_location=device, weights_only=False)
-
         self.model.load_state_dict(checkpoint["model_state_dict"])
         self.model.to(device)
-
         self.model.eval()
         return self.model
 

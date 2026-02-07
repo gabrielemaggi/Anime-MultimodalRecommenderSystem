@@ -30,11 +30,22 @@ class Indexing:
 
         self.image_dir = Path("./Dataset/images/")
         self.dataset = Path("./Dataset/AnimeList.csv")
-        self.anime_db_index = "./Embeddings/AnimeVecDb.index"
-        self.anime_db_metadata = "./Embeddings/AnimeVecDb.pkl"
 
+        self.anime_db_index = "./Embeddings/Attention_AnimeVecDb.index"
+        self.anime_db_metadata = "./Embeddings/Attention_AnimeVecDb.pkl"
+        self.fusion_model = "./Embeddings/fusion_model_attention_is_what_you_need.pt"
         # Metadata columns to store
-        self.AM = ["title", "title_english", "title_japanese", "genre", "sypnopsis"]
+        self.AM = [
+            "title",
+            "title_english",
+            "title_japanese",
+            "genre",
+            "sypnopsis",
+            "rating",
+            "score",
+            "scored_by",
+            "popularity",
+        ]
 
         # Vector database
         self.vector_db = None
@@ -45,7 +56,8 @@ class Indexing:
         # Fusion settings (store for encoding queries)
         self.fusion_method = "trainable"
         self.fusion_weights = [0.7, 0.1, 0.2]
-        self.fusion_engine = FusionTrainer(load_model=True)
+
+        self.fusion_engine = None  # FusionTrainer()  # load_model=True)
 
     def _load_dataset(self) -> pd.DataFrame:
         """Load and cache the dataset"""
@@ -148,11 +160,6 @@ class Indexing:
             self.tabular_path, lambda: TabularEncoder().encode(self.dataset), "tabular"
         )
 
-        print("Normalizing embeddings...")
-        synopsis_embeddings = self._normalize_embeddings(synopsis_embeddings)
-        visual_embeddings = self._normalize_embeddings(visual_embeddings)
-        tabular_embeddings = self._normalize_embeddings(tabular_embeddings)
-
         # 2. Align embeddings by common IDs
         print("Aligning embeddings...")
         aligned_data = self._align_embeddings(
@@ -203,6 +210,9 @@ class Indexing:
         )
 
         if not common_ids:
+            print("###" * 50)
+            print("No common IDs found across all embedding sets")
+            print("###" * 50)
             raise ValueError("No common IDs found across all embedding sets")
 
         print(f"Found {len(common_ids)} items with all three embedding types")
@@ -271,36 +281,46 @@ class Indexing:
         tabular_emb: np.ndarray,
     ) -> np.ndarray:
         """
-        Fuse a single set of embeddings using the same method as the database
-
-        Returns:
-            Fused embedding vector
+        Fuse a single set of embeddings using the PRE-TRAINED fusion model
         """
         method = self.fusion_method
-        weights = self.fusion_weights
 
         if method == "trainable":
-            fusion_engine = FusionTrainer(
-                anime_id, synopsis_emb, visual_emb, tabular_emb, 384, load_model=True
+            # Ensure the fusion engine is loaded
+            self._ensure_fusion_engine_loaded()
+
+            # Use the pre-trained model to encode (NO TRAINING!)
+            fused_dict = self.fusion_engine.transform(
+                syn_embs=synopsis_emb.reshape(1, -1),  # (1, 384)
+                vis_embs=visual_emb.reshape(1, -1),  # (1, 384)
+                tab_embs=tabular_emb.reshape(1, -1),  # (1, 384)
+                as_list=False,
             )
-            fusion_engine.train()
-            fused = fusion_engine.transform()
+
+            # Extract the embedding from the returned dict
+            # fused_dict format: {'query_temp': embedding_vector}
+            fused_vector = list(fused_dict.values())[0]
+            return fused_vector
 
         else:
+            # Non-trainable fusion methods
             joint_dict = {anime_id: [synopsis_emb, visual_emb, tabular_emb]}
             fusion_engine = Fusion(joint_dict)
+
             if method == "mean":
                 fused = fusion_engine.mean_fusion()
             elif method == "concatenate":
                 fused = fusion_engine.concatenate()
             elif method == "weighted":
-                if weights is None:
-                    weights = [0.4, 0.4, 0.2]
-                fused = fusion_engine.weighted_average_fusion(weights=weights)
+                if self.fusion_weights is None:
+                    self.fusion_weights = [0.4, 0.4, 0.2]
+                fused = fusion_engine.weighted_average_fusion(
+                    weights=self.fusion_weights
+                )
             else:
                 raise ValueError(f"Unsupported fusion method: {method}")
 
-        return fused
+            return fused
 
     def _create_vector_database(
         self, fused_embeddings: np.ndarray, anime_ids: List[str]
@@ -439,25 +459,6 @@ class Indexing:
     ) -> np.ndarray:
         """
         Encode anime data into a fused embedding vector
-
-        Args:
-            data: Dictionary containing anime information (must include fields for synopsis and tabular encoding)
-            anime_id: Optional anime ID (if not provided, will look for 'id' or 'anime_id' in data)
-            image_path: Optional path to anime poster image (if not provided, will try to find in image_dir)
-
-        Returns:
-            Fused embedding vector that can be used for search
-
-        Example:
-            >>> data = {
-            ...     'title': 'New Anime',
-            ...     'genre': 'Action, Fantasy',
-            ...     'sypnopsis': 'An epic adventure...',
-            ...     'episodes': 24,
-            ...     'rating': 8.5
-            ... }
-            >>> embedding = indexer.encode_from_data(data, image_path='path/to/poster.jpg')
-            >>> results = indexer.search(embedding, top_k=5)
         """
         self._ensure_encoders_loaded()
 
@@ -465,7 +466,7 @@ class Indexing:
         if anime_id is None:
             anime_id = data.get("id") or data.get("anime_id")
             if anime_id is None:
-                anime_id = "temp"  # Use temporary ID if none provided
+                anime_id = "temp"
 
         # 1. Encode synopsis
         synopsis = data.get("sypnopsis") or data.get("synopsis") or ""
@@ -476,7 +477,6 @@ class Indexing:
 
         # 2. Encode visual (poster image)
         if image_path is None:
-            # Try to find image in image directory
             possible_extensions = [".jpg", ".png", ".webp"]
             for ext in possible_extensions:
                 potential_path = self.image_dir / f"{anime_id}{ext}"
@@ -492,18 +492,16 @@ class Indexing:
         visual_embedding = self.visual_encoder.run_model(image_path)
 
         # 3. Encode tabular data
-        # Convert data to DataFrame row for tabular encoder
-        # df_row = pd.DataFrame([data])
         print(data.get("title"))
         tabular_embedding = self.tabular_encoder.run_model(data.get("title"))
 
-        # 4. Fuse embeddings
+        # 4. Fuse embeddings using PRE-TRAINED model
         fused_embedding = self._fuse_single_embeddings(
             anime_id, synopsis_embedding, visual_embedding, tabular_embedding
         )
 
-        # self.vector_db.add if save
-        return fused_embedding.get("embedding")
+        # Return just the embedding vector (not a dict)
+        return fused_embedding
 
     def encode_image(self, image):
         self._ensure_encoders_loaded()
@@ -517,8 +515,35 @@ class Indexing:
         self._ensure_encoders_loaded()
         return self.synopsis_encoder.run_model(anime_title)
 
+    def _ensure_fusion_engine_loaded(self):
+        """Load the pre-trained fusion model if not already loaded"""
+        if self.fusion_engine is None:
+            if not os.path.exists(self.fusion_model):
+                raise FileNotFoundError(
+                    f"Fusion model not found at {self.fusion_model}. "
+                    "Please train the model first using build_vector_database()"
+                )
+
+            print("Loading pre-trained fusion model...")
+            # Load the model WITHOUT training data (just the model weights)
+            self.fusion_engine = FusionTrainer(
+                item_ids=None,
+                syn_embs=None,
+                vis_embs=None,
+                tab_embs=None,
+                output_dim=384,
+                load_model=True,  # This flag should load the model
+            )
+            print("Fusion model loaded successfully")
+
     def align_embedding(self, embedding, modality):
-        # print(embedding)
+        """Align a single modality embedding using the trained fusion model"""
+        self._ensure_fusion_engine_loaded()
+
+        if not os.path.exists(self.fusion_model):
+            print(f"Warning: Fusion model not found at {self.fusion_model}")
+            return embedding
+
         aligned = self.fusion_engine.encode_single_modality(embedding, modality)
         return aligned
 
@@ -629,3 +654,23 @@ class Indexing:
         print(
             f"✅ Successfully added '{meta.get('title')}' to the vector database and saved."
         )
+
+    def get_anime_info_by_id(self, anime_id: int):
+        """
+        Retrieves the row where the column 'id' matches the given anime_id.
+        """
+        df = self._load_dataset()
+
+        # Filter the dataframe where the column 'id' matches our input
+        # This works regardless of what the dataframe index is set to
+        result = df[df["id"] == int(anime_id)]
+
+        if not result.empty:
+            # result.iloc[0] gets the first matching row
+            # .to_dict() converts it to the format you need
+            row_dict = result.iloc[0].to_dict()
+
+            # Clean up 'nan' values so they don't break your title extraction logic
+            return {k: (v if pd.notnull(v) else None) for k, v in row_dict.items()}
+
+        return None

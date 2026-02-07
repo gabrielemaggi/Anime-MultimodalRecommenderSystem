@@ -121,10 +121,10 @@ class RecommenderEvaluator:
 
 
 # Constants
-OUTPUT_FILE = "./Embeddings/recs_output.jsonl"
-ERROR_LOG = "./Embeddings/processing_errors.log"
-CHUNK_SIZE = 5000  # Smaller chunks for safety
-GC_FREQUENCY = 20  # Garbage collect every N users
+OUTPUT_FILE = "./Embeddings/attention_recs_output.jsonl"
+ERROR_LOG = "./Embeddings/attention_processing_errors.log"
+CHUNK_SIZE = 1000  # Smaller chunks for safety
+GC_FREQUENCY = 100  # Garbage collect every N users
 
 
 @contextmanager
@@ -376,7 +376,7 @@ def generate_recommendations_safe():
     print("=" * 60)
 
 
-def evaluate_from_file(recs_file="recs_output.jsonl"):
+def evaluate_from_file(recs_file="./Embeddings/attention_recs_output.jsonl"):
     """Evaluate generated recommendations"""
 
     print("\n" + "=" * 60)
@@ -389,7 +389,7 @@ def evaluate_from_file(recs_file="recs_output.jsonl"):
         if "anime_id" in df_interactions.columns:
             df_interactions = df_interactions.rename(columns={"anime_id": "anime_id"})
 
-        df_catalog = pd.read_csv("./AnimeList.csv")
+        df_catalog = pd.read_csv("./Dataset/AnimeList.csv")
         full_catalog_ids = df_catalog["id"].unique()
         print("       dataset loaded")
 
@@ -432,7 +432,7 @@ def evaluate_from_file(recs_file="recs_output.jsonl"):
 
 if __name__ == "__main__":
     try:
-        generate_recommendations_safe()
+        # generate_recommendations_safe()
 
         # Uncomment to run evaluation after generation
         # print("\n")
