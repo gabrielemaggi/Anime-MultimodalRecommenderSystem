@@ -42,6 +42,23 @@ st.markdown(
         transform: scale(1.02);
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
+    /* Synopsis section styling */
+    .synopsis-section {
+        padding: 1rem;
+        background: #3e484b;
+        border-radius: 8px;
+        line-height: 1.6;
+        font-size: 0.95rem;
+    }
+    /* Genre tags */
+    .genre-tag {
+        background: #3e484b;
+        padding: 4px 10px;
+        border-radius: 12px;
+        margin: 2px;
+        display: inline-block;
+        font-size: 0.85rem;
+    }
 </style>
 """,
     unsafe_allow_html=True,
@@ -203,6 +220,103 @@ def get_user_object():
                 int(u_name) if u_name.isdigit() else u_name
             )
     return st.session_state.user_object
+
+
+# ---------------------------------------------------------------------------
+# Modal Dialog for Anime Details
+# ---------------------------------------------------------------------------
+@st.dialog("Anime Details", width="large")
+def show_anime_details(anime_id, anime_title, similarity=None):
+    """Display anime details in a modal dialog"""
+    lookup = get_anime_lookup()
+    anime_info = lookup.get(int(anime_id)) if str(anime_id).isdigit() else None
+
+    if not anime_info:
+        st.error("No information available for this anime.")
+        return
+
+    # Create horizontal layout: Image on left, Info on right
+    col_img, col_info = st.columns([1, 2])
+
+    with col_img:
+        # Image
+        img_path = find_anime_image(str(anime_id))
+        if img_path:
+            st.image(img_path, use_container_width=True)
+        else:
+            st.image("https://via.placeholder.com/300x450", use_container_width=True)
+            # Metadata in compact horizontal layout
+
+        if anime_info.get("type") and not pd.isna(anime_info.get("type")):
+            st.markdown(f"**📺 Type**  \n{anime_info.get('type')}")
+        if anime_info.get("episodes") and not pd.isna(anime_info.get("episodes")):
+            st.markdown(f"**📊 Episodes**  \n{anime_info.get('episodes')}")
+
+        if anime_info.get("score") and not pd.isna(anime_info.get("score")):
+            st.markdown(f"**⭐ Score**  \n{anime_info.get('score')}/10")
+        if anime_info.get("studio") and not pd.isna(anime_info.get("studio")):
+            studios = anime_info.get("studio").split(",")
+            st.markdown(f"**🎬 Studio**  \n{studios[0].strip()}")
+
+    with col_info:
+        # Header with titles
+        # English title (main)
+        if anime_info.get("title_english") and not pd.isna(
+            anime_info.get("title_english")
+        ):
+            st.markdown(
+                f'<h2 style="margin-top: 0; margin-bottom: 0.5rem;">{anime_info.get("title_english")}</h2>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f'<h2 style="margin-top: 0; margin-bottom: 0.5rem;">{anime_title}</h2>',
+                unsafe_allow_html=True,
+            )
+
+        # Japanese title (subtitle)
+        if anime_info.get("title_japanese") and not pd.isna(
+            anime_info.get("title_japanese")
+        ):
+            st.markdown(
+                f'<p style="color: #888; font-size: 1.1rem; margin-top: 0;">{anime_info.get("title_japanese")}</p>',
+                unsafe_allow_html=True,
+            )
+
+        # Synopsis - Full width below
+        synopsis_key = None
+        for key in ["sypnopsis", "synopsis"]:
+            if anime_info.get(key) and not pd.isna(anime_info.get(key)):
+                synopsis_key = key
+                break
+        if synopsis_key:
+            st.markdown("---")
+            st.markdown("### 📖 Synopsis")
+            st.markdown(
+                f'<div class="synopsis-section">{anime_info.get(synopsis_key)}</div>',
+                unsafe_allow_html=True,
+            )
+        st.markdown("---")
+
+        if anime_info.get("genre") and not pd.isna(anime_info.get("genre")):
+            genres = [g.strip() for g in anime_info.get("genre").split(",")]
+            st.markdown(f"**🎭 Genres**  {len(genres)} total")
+            genres_html = " ".join(
+                [
+                    f'<span style="background: #3e484b; padding: 4px 10px; border-radius: 12px; margin: 2px; display: inline-block; font-size: 0.85rem;">{g}</span>'
+                    for g in genres
+                ]
+            )
+            st.markdown(
+                f'<div style="margin: 0.5rem 0;">{genres_html}</div>',
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("---")
+
+    # Close button
+    # if st.button("✕ Close", type="secondary", use_container_width=True):
+    #    st.rerun()
 
 
 # ---------------------------------------------------------------------------
@@ -490,16 +604,16 @@ if st.session_state.logged_in_user is not None:
                             with st.container(border=True):
                                 img = find_anime_image(anime_id)
 
-                                # Clickable image - clicking toggles details
+                                # Clickable image with magnifying glass icon
                                 if st.button(
-                                    "Click to view details",
-                                    key=f"img_btn_{anime_id}_{idx}",
+                                    "🔍 View Details",
+                                    key=f"view_btn_{anime_id}_{idx}",
                                     use_container_width=True,
                                 ):
-                                    st.session_state[
-                                        f"show_details_{anime_id}_{idx}"
-                                    ] = not st.session_state.get(
-                                        f"show_details_{anime_id}_{idx}", False
+                                    show_anime_details(
+                                        anime_id,
+                                        anime.get("title", "Unknown"),
+                                        anime.get("similarity"),
                                     )
 
                                 st.image(
@@ -519,91 +633,6 @@ if st.session_state.logged_in_user is not None:
                                 </div>""",
                                     unsafe_allow_html=True,
                                 )
-
-                                # Show details if button was clicked
-                                if st.session_state.get(
-                                    f"show_details_{anime_id}_{idx}", False
-                                ):
-                                    with st.expander("📋 Details", expanded=True):
-                                        lookup = get_anime_lookup()
-                                        anime_info = (
-                                            lookup.get(int(anime_id))
-                                            if anime_id.isdigit()
-                                            else None
-                                        )
-
-                                        if anime_info:
-                                            # Title
-                                            if anime_info.get(
-                                                "title_english"
-                                            ) and not pd.isna(
-                                                anime_info.get("title_english")
-                                            ):
-                                                st.markdown(
-                                                    f"**English Title:** {anime_info.get('title_english')}"
-                                                )
-                                            if anime_info.get(
-                                                "title_japanese"
-                                            ) and not pd.isna(
-                                                anime_info.get("title_japanese")
-                                            ):
-                                                st.markdown(
-                                                    f"**Japanese Title:** {anime_info.get('title_japanese')}"
-                                                )
-
-                                            st.divider()
-
-                                            # Metadata
-                                            if anime_info.get("genre") and not pd.isna(
-                                                anime_info.get("genre")
-                                            ):
-                                                st.markdown(
-                                                    f"**🎭 Genres:** {anime_info.get('genre')}"
-                                                )
-
-                                            if anime_info.get("studio") and not pd.isna(
-                                                anime_info.get("studio")
-                                            ):
-                                                st.markdown(
-                                                    f"**🎬 Studio:** {anime_info.get('studio')}"
-                                                )
-
-                                            if anime_info.get("type") and not pd.isna(
-                                                anime_info.get("type")
-                                            ):
-                                                st.markdown(
-                                                    f"**📺 Type:** {anime_info.get('type')}"
-                                                )
-
-                                            if anime_info.get(
-                                                "episodes"
-                                            ) and not pd.isna(
-                                                anime_info.get("episodes")
-                                            ):
-                                                st.markdown(
-                                                    f"**📊 Episodes:** {anime_info.get('episodes')}"
-                                                )
-
-                                            if anime_info.get("score") and not pd.isna(
-                                                anime_info.get("score")
-                                            ):
-                                                st.markdown(
-                                                    f"**⭐ Score:** {anime_info.get('score')}/10"
-                                                )
-
-                                            # Synopsis
-                                            if anime_info.get(
-                                                "synopsis"
-                                            ) and not pd.isna(
-                                                anime_info.get("synopsis")
-                                            ):
-                                                st.divider()
-                                                st.markdown("**📖 Synopsis:**")
-                                                st.write(anime_info.get("synopsis"))
-                                        else:
-                                            st.info(
-                                                "No additional information available for this anime."
-                                            )
 
                                 with st.form(key=f"f_{anime_id}_{idx}"):
                                     rating = st.number_input(
@@ -709,18 +738,13 @@ if st.session_state.logged_in_user is not None:
                             with st.container(border=True):
                                 img = find_anime_image(str(item["id"]))
 
-                                # Clickable button for details
+                                # Clickable button for details with magnifying glass
                                 if st.button(
-                                    "Click to view details",
-                                    key=f"history_img_btn_{item['id']}_{idx}",
+                                    "🔍 View Details",
+                                    key=f"history_view_btn_{item['id']}_{idx}",
                                     use_container_width=True,
                                 ):
-                                    st.session_state[
-                                        f"show_history_details_{item['id']}_{idx}"
-                                    ] = not st.session_state.get(
-                                        f"show_history_details_{item['id']}_{idx}",
-                                        False,
-                                    )
+                                    show_anime_details(item["id"], item["title"], None)
 
                                 st.image(
                                     img
@@ -747,86 +771,6 @@ if st.session_state.logged_in_user is not None:
                                 """,
                                     unsafe_allow_html=True,
                                 )
-
-                                # Show details if button was clicked
-                                if st.session_state.get(
-                                    f"show_history_details_{item['id']}_{idx}", False
-                                ):
-                                    with st.expander("📋 Details", expanded=True):
-                                        anime_info = lookup.get(item["id"])
-
-                                        if anime_info:
-                                            # Title
-                                            if anime_info.get(
-                                                "title_english"
-                                            ) and not pd.isna(
-                                                anime_info.get("title_english")
-                                            ):
-                                                st.markdown(
-                                                    f"**English Title:** {anime_info.get('title_english')}"
-                                                )
-                                            if anime_info.get(
-                                                "title_japanese"
-                                            ) and not pd.isna(
-                                                anime_info.get("title_japanese")
-                                            ):
-                                                st.markdown(
-                                                    f"**Japanese Title:** {anime_info.get('title_japanese')}"
-                                                )
-
-                                            st.divider()
-
-                                            # Metadata
-                                            if anime_info.get("genre") and not pd.isna(
-                                                anime_info.get("genre")
-                                            ):
-                                                st.markdown(
-                                                    f"**🎭 Genres:** {anime_info.get('genre')}"
-                                                )
-
-                                            if anime_info.get("studio") and not pd.isna(
-                                                anime_info.get("studio")
-                                            ):
-                                                st.markdown(
-                                                    f"**🎬 Studio:** {anime_info.get('studio')}"
-                                                )
-
-                                            if anime_info.get("type") and not pd.isna(
-                                                anime_info.get("type")
-                                            ):
-                                                st.markdown(
-                                                    f"**📺 Type:** {anime_info.get('type')}"
-                                                )
-
-                                            if anime_info.get(
-                                                "episodes"
-                                            ) and not pd.isna(
-                                                anime_info.get("episodes")
-                                            ):
-                                                st.markdown(
-                                                    f"**📊 Episodes:** {anime_info.get('episodes')}"
-                                                )
-
-                                            if anime_info.get("score") and not pd.isna(
-                                                anime_info.get("score")
-                                            ):
-                                                st.markdown(
-                                                    f"**⭐ Score:** {anime_info.get('score')}/10"
-                                                )
-
-                                            # Synopsis
-                                            if anime_info.get(
-                                                "synopsis"
-                                            ) and not pd.isna(
-                                                anime_info.get("synopsis")
-                                            ):
-                                                st.divider()
-                                                st.markdown("**📖 Synopsis:**")
-                                                st.write(anime_info.get("synopsis"))
-                                        else:
-                                            st.info(
-                                                "No additional information available for this anime."
-                                            )
 else:
     st.title("👋 Welcome")
     st.info("Enter your username or ID in the sidebar to start.")
