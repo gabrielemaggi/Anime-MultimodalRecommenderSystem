@@ -138,6 +138,58 @@ class User(GeneralUser):
 
             traceback.print_exc()
 
+    def add_anime(self, anime_id, rating):
+        print(self.watched)
+        self.watched.append([int(anime_id), int(rating)])
+
+    def add_filtering(self, query_vector, mode="append", magnitude=0.7):
+        """
+        Add filtering to user's cluster centroids.
+        Parameters:
+        -----------
+        query_vector : numpy array or list
+            The query vector to use for filtering
+        mode : str, default='append'
+            - 'append': Add the query vector as a new centroid
+            - 'move': Move existing centroids toward the query vector
+        Returns:
+        --------
+        numpy array : Updated embeddings
+        """
+        if self.embeddings is None:
+            raise ValueError("No embeddings found. Run findCentersOfClusters() first.")
+        query_vector = np.array(query_vector)
+        if mode == "append":
+            # Original behavior: append the query as a new centroid
+            self.embeddings = np.append(self.embeddings, [query_vector], axis=0)
+
+        elif mode == "move":
+            # New behavior: move centroids toward the query vector
+            # Calculate distances from each centroid to the query
+            distances = np.linalg.norm(self.embeddings - query_vector, axis=1)
+            # Find the maximum distance (most distant centroid)
+            max_distance = np.max(distances)
+            # Heuristic: move each centroid toward query by a fraction of max_distance
+            # This ensures we don't move too much relative to the spread of centroids
+            # The farther a centroid is from the query, the less we move it (proportionally)
+            alpha = magnitude  # Tunable parameter: how much to move (0 = no move, 1 = full move to query)
+            moved_embeddings = []
+            for i, centroid in enumerate(self.embeddings):
+                # Calculate the direction vector from centroid to query
+                direction = query_vector - centroid
+                # Scale movement inversely with distance to preserve cluster structure
+                # Closer centroids move more, distant ones move less
+                movement_scale = (
+                    alpha * (1 - distances[i] / max_distance) if max_distance > 0 else 0
+                )
+                # Move the centroid
+                new_centroid = centroid + movement_scale * direction
+                moved_embeddings.append(new_centroid)
+            self.embeddings = np.array(moved_embeddings)
+        else:
+            raise ValueError(f"Unknown mode: {mode}. Use 'append' or 'move'.")
+        return self.embeddings
+
 
 
 
