@@ -69,7 +69,9 @@ class User:
                     watched.append([anime_id, score])
                 else:
                     print(f"Warning: {title_mal} do not find in the anime database.")
-                    # self.manager.add_anime_by_search(title_mal) # Missing Node2Vec new insertion
+                    # self.manager.add_anime_by_search(
+                    #    title_mal
+                    # )  # Missing Node2Vec new insertion
 
             self.watched = watched
             self.watch_anime_info = watched

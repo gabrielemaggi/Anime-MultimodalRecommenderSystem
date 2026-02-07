@@ -1,4 +1,5 @@
 import os
+import pickle
 
 import networkx as nx
 import numpy as np
@@ -208,7 +209,7 @@ class TabularEncoder:
 
         return results
 
-    def run_model(self, anime_title):
+    def _old(self, anime_title):
 
         self.load_embeddings()
 
@@ -322,6 +323,410 @@ class TabularEncoder:
                     print(f"✗ Studio not found: {studio}")
 
         return results
+
+    def add_anime_to_model(self, anime_data, retrain=True):
+        """
+        Add a new anime to the graph and optionally retrain the model.
+
+        Args:
+            anime_data: Dictionary with anime info (title, genre, studio, score, scored_by)
+            retrain: Whether to retrain the model after adding (default: True)
+
+        Returns:
+            The embedding for the new anime
+        """
+        if self.G is None:
+            raise ValueError("Graph not built. Load the graph first.")
+
+        if self.model is None:
+            self.load_embeddings()
+
+        # Extract data
+        anime_title = anime_data.get("title")
+        genres = anime_data.get("genre", "")
+        studios = anime_data.get("studios", "") or anime_data.get("studio", "")
+        score = anime_data.get("score", 5.0)
+        scored_by = anime_data.get("scored_by", 1.0)
+
+        if not anime_title:
+            raise ValueError("anime_data must contain 'title'")
+
+        # Create anime node
+        anime_node = f"Anime_{anime_title}"
+
+        # Check if already exists
+        if anime_node in self.G:
+            print(f"Anime '{anime_title}' already exists in graph.")
+            vectors = self.model.wv if hasattr(self.model, "wv") else self.model
+            if anime_node in vectors:
+                return vectors[anime_node]
+
+        print(f"Adding '{anime_title}' to graph...")
+
+        # Add node to graph
+        self.G.add_node(anime_node, type="anime", title=anime_title)
+
+        # Calculate quality multiplier (same as __build_graph)
+        try:
+            score = float(score) if score else 5.0
+            scored_by = float(scored_by) if scored_by else 1.0
+        except (ValueError, TypeError):
+            score = 5.0
+            scored_by = 1.0
+
+        score_factor = (score / 10.0) + 0.1
+        popularity_factor = np.log10(scored_by + 10.0)
+        quality_multiplier = score_factor * popularity_factor
+
+        BASE_GENRE_WEIGHT = 1.0
+        BASE_STUDIO_WEIGHT = 1.0
+
+        # Add genre edges
+        if genres:
+            if isinstance(genres, str):
+                genres_list = [g.strip() for g in genres.split(",")]
+            else:
+                genres_list = genres
+
+            for genre in genres_list:
+                if genre:
+                    genre_node = f"Genre_{genre}"
+                    # Add genre node if it doesn't exist
+                    if genre_node not in self.G:
+                        self.G.add_node(genre_node, type="genre")
+                        print(f"  + New genre node: {genre}")
+
+                    final_weight = BASE_GENRE_WEIGHT * quality_multiplier
+                    self.G.add_edge(anime_node, genre_node, weight=final_weight)
+                    print(
+                        f"  ✓ Connected to genre: {genre} (weight: {final_weight:.2f})"
+                    )
+
+        # Add studio edges
+        if studios:
+            if isinstance(studios, str):
+                studios_list = [s.strip() for s in studios.split(",")]
+            else:
+                studios_list = studios
+
+            for studio in studios_list:
+                if studio:
+                    studio_node = f"Studio_{studio}"
+                    # Add studio node if it doesn't exist
+                    if studio_node not in self.G:
+                        self.G.add_node(studio_node, type="studio")
+                        print(f"  + New studio node: {studio}")
+
+                    final_weight = BASE_STUDIO_WEIGHT * quality_multiplier
+                    self.G.add_edge(anime_node, studio_node, weight=final_weight)
+                    print(
+                        f"  ✓ Connected to studio: {studio} (weight: {final_weight:.2f})"
+                    )
+
+        # Retrain if requested
+        if retrain:
+            print("Generating random walks for new node...")
+            embedding = self._incremental_train(anime_node)
+
+            # Save updated model
+            self.save_model(self.model_path, self.vectors_path)
+            print(f"✅ Model updated and saved")
+
+            return embedding
+        else:
+            print("⚠️  Node added to graph but model not retrained")
+            return None
+
+    def _incremental_train(self, new_node=None, num_walks=100, walk_length=30):
+        """
+        Incrementally train the model on new nodes using random walks.
+
+        Args:
+            new_node: Specific node to focus walks on (optional)
+            num_walks: Number of random walks per node
+            walk_length: Length of each walk
+
+        Returns:
+            Embedding for the new node (if specified)
+        """
+        if self.G is None:
+            raise ValueError("Graph not available")
+
+        if self.model is None:
+            raise ValueError("Model not loaded")
+
+        # Generate walks
+        print(f"Generating random walks...")
+
+        if new_node:
+            # Focus walks on the new node and its neighbors
+            nodes_to_walk = [new_node]
+            # Add neighbors for context
+            neighbors = list(self.G.neighbors(new_node))
+            nodes_to_walk.extend(neighbors)
+            print(f"Focusing on new node and {len(neighbors)} neighbors")
+            # More walks for the new node itself
+            node_walk_counts = {new_node: num_walks}
+            for neighbor in neighbors:
+                node_walk_counts[neighbor] = max(
+                    10, num_walks // 10
+                )  # Fewer walks for neighbors
+        else:
+            # Walk all nodes
+            nodes_to_walk = list(self.G.nodes())
+            node_walk_counts = {node: num_walks for node in nodes_to_walk}
+
+        # Generate walks
+        walks = []
+        for node in nodes_to_walk:
+            walk_count = node_walk_counts.get(node, num_walks)
+            for _ in range(walk_count):
+                walk = self._random_walk(node, walk_length)
+                walks.append(walk)
+
+        print(f"Generated {len(walks)} walks")
+
+        # Build vocabulary for new nodes
+        vectors = self.model.wv if hasattr(self.model, "wv") else self.model
+
+        new_words = []
+        for walk in walks:
+            for node in walk:
+                if node not in vectors:
+                    new_words.append(node)
+
+        if new_words:
+            unique_new = list(set(new_words))
+            print(f"Adding {len(unique_new)} new words to vocabulary...")
+            self.model.build_vocab(walks, update=True)
+
+        # Train on new walks
+        print("Training model on new walks...")
+        self.model.train(walks, total_examples=len(walks), epochs=self.model.epochs)
+
+        print("✅ Incremental training complete")
+
+        # Return embedding for new node
+        if new_node:
+            vectors = self.model.wv if hasattr(self.model, "wv") else self.model
+            if new_node in vectors:
+                return vectors[new_node]
+            else:
+                print(f"⚠️  Warning: {new_node} not in vectors after training")
+
+        return None
+
+    def _random_walk(self, start_node, walk_length):
+        """
+        Perform a weighted random walk from start_node.
+
+        Args:
+            start_node: Starting node
+            walk_length: Length of the walk
+
+        Returns:
+            List of node names representing the walk
+        """
+        walk = [start_node]
+
+        for _ in range(walk_length - 1):
+            current = walk[-1]
+            neighbors = list(self.G.neighbors(current))
+
+            if not neighbors:
+                break
+
+            # Get edge weights
+            weights = []
+            for neighbor in neighbors:
+                weight = self.G[current][neighbor].get("weight", 1.0)
+                weights.append(weight)
+
+            # Normalize weights to probabilities
+            total_weight = sum(weights)
+            if total_weight > 0:
+                probabilities = [w / total_weight for w in weights]
+            else:
+                probabilities = [1.0 / len(neighbors)] * len(neighbors)
+
+            # Choose next node based on weights
+            next_node = np.random.choice(neighbors, p=probabilities)
+            walk.append(next_node)
+
+        return walk
+
+    def run_model(
+        self,
+        anime_title=None,
+        genres=None,
+        studios=None,
+        score=None,
+        scored_by=None,
+        auto_add=False,
+    ):
+        """
+        Get embedding for an anime. Optionally add to model if not found.
+
+        Args:
+            anime_title: Title of the anime
+            genres: List or comma-separated string of genres
+            studios: List or comma-separated string of studios
+            score: MAL score (0-10)
+            scored_by: Number of users who scored it
+            auto_add: If True, automatically add missing anime to model
+
+        Returns:
+            numpy array embedding
+        """
+        self.load_embeddings()
+
+        # Also load graph if not loaded
+        if self.G is None:
+            print("Loading graph structure...")
+            self._load_graph()
+
+        vectors = self.model.wv if hasattr(self.model, "wv") else self.model
+
+        # Try to get existing embedding
+        if anime_title:
+            node_key = f"Anime_{anime_title}"
+            if node_key in vectors:
+                return vectors[node_key]
+
+        # If auto_add is enabled and we have enough info
+        if auto_add and anime_title and (genres or studios):
+            print(f"Auto-adding '{anime_title}' to model...")
+            anime_data = {
+                "title": anime_title,
+                "genre": genres,
+                "studios": studios,
+                "score": score,
+                "scored_by": scored_by,
+            }
+            return self.add_anime_to_model(anime_data, retrain=True)
+
+        # Otherwise, fall back to averaging
+        print(f"Anime '{anime_title}' not found. Constructing from metadata...")
+        return self._construct_from_metadata(genres, studios, score, scored_by)
+
+    def _construct_from_metadata(self, genres, studios, score=None, scored_by=None):
+        """Fallback: construct embedding from genre/studio averaging"""
+        vectors = self.model.wv if hasattr(self.model, "wv") else self.model
+
+        embeddings_to_average = []
+
+        # Process genres
+        if genres:
+            if isinstance(genres, str):
+                genres = [g.strip() for g in genres.split(",")]
+
+            for genre in genres:
+                if genre:
+                    genre_key = f"Genre_{genre}"
+                    if genre_key in vectors:
+                        embeddings_to_average.append(vectors[genre_key])
+                        print(f"  ✓ Genre: {genre}")
+
+        # Process studios
+        if studios:
+            if isinstance(studios, str):
+                studios = [s.strip() for s in studios.split(",")]
+
+            for studio in studios:
+                if studio:
+                    studio_key = f"Studio_{studio}"
+                    if studio_key in vectors:
+                        embeddings_to_average.append(vectors[studio_key])
+                        print(f"  ✓ Studio: {studio}")
+
+        if embeddings_to_average:
+            avg_embedding = np.mean(embeddings_to_average, axis=0)
+            print(f"  → Averaged {len(embeddings_to_average)} embeddings")
+            return avg_embedding
+        else:
+            print(f"  ✗ No valid metadata. Returning zero vector.")
+            return np.zeros(self.embedding_dim)
+
+    def _load_graph(self):
+        """Load graph structure from saved file or rebuild from CSV"""
+        graph_path = "./Embeddings/anime_graph.pkl"
+
+        if os.path.exists(graph_path):
+            try:
+                import pickle
+
+                print(f"Loading graph from {graph_path}...")
+                with open(graph_path, "rb") as f:
+                    self.G = pickle.load(f)
+                print(f"Graph loaded: {self.G.number_of_nodes()} nodes")
+                return
+            except (EOFError, pickle.UnpicklingError, Exception) as e:
+                print(f"⚠️  Failed to load graph: {e}")
+                print("Removing corrupted graph file and rebuilding...")
+                try:
+                    os.remove(graph_path)
+                except:
+                    pass
+
+        # If we get here, we need to rebuild
+        print("Rebuilding graph from CSV...")
+        if self.df is None:
+            # Try to load the default CSV
+            csv_path = "./Dataset/AnimeList.csv"
+            if os.path.exists(csv_path):
+                self.__load(csv_path)
+            else:
+                raise ValueError(
+                    "Cannot load graph: no saved graph and no CSV found at ./Dataset/AnimeList.csv"
+                )
+
+        # Build the graph
+        self.__build_graph()
+
+        # Save for next time
+        try:
+            import pickle
+
+            with open(graph_path, "wb") as f:
+                pickle.dump(self.G, f)
+            print(f"✅ Graph saved to {graph_path}")
+        except Exception as e:
+            print(f"⚠️  Failed to save graph: {e}")
+
+    def save_model(self, model_path, vector_path):
+        """Save model and graph with error handling"""
+        if not self.model:
+            print("No model to save.")
+            return
+
+        try:
+            # Save Gensim Model
+            print(f"Saving model to {model_path}...")
+            self.model.save(model_path)
+            print("✅ Model saved")
+        except Exception as e:
+            print(f"⚠️  Failed to save model: {e}")
+
+        try:
+            # Save vectors
+            print(f"Saving vectors to {vector_path}...")
+            self.model.wv.save_word2vec_format(vector_path)
+            print("✅ Vectors saved")
+        except Exception as e:
+            print(f"⚠️  Failed to save vectors: {e}")
+
+        # Save graph structure
+        if self.G:
+            try:
+                import pickle
+
+                graph_path = "./Embeddings/anime_graph.pkl"
+                print(f"Saving graph to {graph_path}...")
+                with open(graph_path, "wb") as f:
+                    pickle.dump(self.G, f)
+                print("✅ Graph saved")
+            except Exception as e:
+                print(f"⚠️  Failed to save graph: {e}")
 
 
 # --- MAIN TEST SCRIPT ---

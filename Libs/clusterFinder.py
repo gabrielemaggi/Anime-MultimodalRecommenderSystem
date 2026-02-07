@@ -42,6 +42,7 @@ class clusterFinder:
         self.scores = [np.exp((x - 5) / 2.0) for x in self.scores]
         # print(self.scores)
         # run with weights
+        print(self.vectors)
         kmeans.fit(self.vectors, sample_weight=self.scores)
 
         # the ceneters are the user profile

@@ -491,16 +491,26 @@ class Indexing:
 
         visual_embedding = self.visual_encoder.run_model(image_path)
 
-        # 3. Encode tabular data
-        print(data.get("title"))
-        tabular_embedding = self.tabular_encoder.run_model(data.get("title"))
+        # 3. Encode tabular data with auto-add capability
+        tabular_embedding = self.tabular_encoder.run_model(
+            anime_title=data.get("title"),
+            genres=data.get("genre", ""),
+            studios=data.get("studios", "") or data.get("studio", ""),
+            score=data.get("score"),
+            scored_by=data.get("scored_by"),
+            auto_add=True,  # Automatically add new anime to model
+        )
 
-        # 4. Fuse embeddings using PRE-TRAINED model
+        if tabular_embedding is None:
+            raise ValueError(
+                f"Failed to create tabular embedding for {data.get('title')}"
+            )
+
+        # 4. Fuse embeddings
         fused_embedding = self._fuse_single_embeddings(
             anime_id, synopsis_embedding, visual_embedding, tabular_embedding
         )
 
-        # Return just the embedding vector (not a dict)
         return fused_embedding
 
     def encode_image(self, image):
