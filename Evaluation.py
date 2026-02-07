@@ -15,8 +15,8 @@ from Libs.User import *
 class RecommenderEvaluator:
     """
     A specialized evaluation class for Recommendation Systems.
-    Focuses on beyond-accuracy metrics: Catalog Coverage, Distributional Coverage (Gini/Entropy),
-    Novelty (Inverse Popularity), and Serendipity.
+    Focuses on beyond-accuracy metrics: Catalog Coverage, Distributional Coverage (Entropy)
+    and Novelty.
     """
 
     def __init__(self, train_df, catalog_items):
@@ -90,6 +90,25 @@ class RecommenderEvaluator:
         if not rec_dict:
             return 0.0
 
+        # First, calculate the popularity_score correctly
+        # popularity_score(i) = (number of users who interacted with i) / (max popularity in catalog)
+
+        # Count interactions per item
+        item_interaction_count = {}
+        for user_id, rec_list in rec_dict.items():
+            for item in rec_list:
+                item_interaction_count[item] = item_interaction_count.get(item, 0) + 1
+
+        # Find maximum popularity in the catalog
+        max_popularity = (
+            max(item_interaction_count.values()) if item_interaction_count else 1.0
+        )
+
+        # Calculate normalized popularity_score for each item
+        popularity_scores = {}
+        for item, count in item_interaction_count.items():
+            popularity_scores[item] = count / max_popularity
+
         user_novelty_scores = []
 
         # Calculate novelty for each user
@@ -98,23 +117,17 @@ class RecommenderEvaluator:
                 continue
 
             novelty_sum = 0.0
-            all_popularities = []
+
             for item in rec_list:
-                # Get the popularity score for this item
-                if item in self.item_popularity:
-                    popularity = self.item_popularity[item]
-                else:
-                    popularity = self.min_prob
+                # Get the normalized popularity score for this item
+                popularity = popularity_scores.get(item, 0.0)
+
                 # Add (1 - popularity_score)
                 novelty_sum += 1 - popularity
-                all_popularities.append(popularity)
 
             # Average for this user: (1 / |R_u|) * Σ (1 - popularity_score(i))
             user_novelty = novelty_sum / len(rec_list)
             user_novelty_scores.append(user_novelty)
-
-        min_novelty = min(user_novelty_scores) if user_novelty_scores else 0.0
-        max_popularity = max(all_popularities) if all_popularities else 0.0
 
         # Return the average novelty across all users
         return np.mean(user_novelty_scores) if user_novelty_scores else 0.0
@@ -432,7 +445,7 @@ def evaluate_from_file(recs_file="./Embeddings/attention_recs_output.jsonl"):
 
 if __name__ == "__main__":
     try:
-        # generate_recommendations_safe()
+        generate_recommendations_safe()
 
         # Uncomment to run evaluation after generation
         # print("\n")

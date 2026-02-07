@@ -1,30 +1,29 @@
 # Use an official lightweight Python image.
-# https://hub.docker.com/_/python
 FROM python:3.13
 
-# Set environment variables to prevent Python from writing pyc files to disc
-# and buffering stdout and stderr.
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Set the working directory in the container
+# Set the working directory
 WORKDIR /app
 
-# Copy the requirements file into the container at /app
-COPY requirements.txt /app/
+# Copy requirements first to leverage Docker cache
+# (Ensure requirements.txt exists in the same directory as the Dockerfile)
+COPY requirements.txt .
 
-# Install the dependencies specified in requirements.txt
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the current directory contents into the container at /app
-COPY . /app
+# Copy the rest of the application code
+COPY . .
 
-# Expose the port Streamlit runs on (default is 8501)
+# Expose the Streamlit port
 EXPOSE 8501
 
-# Healthcheck to ensure the container is responsive
+# Healthcheck
 HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
 
 # Command to run the application
-# ENTRYPOINT allows you to pass arguments to the container command if needed
-ENTRYPOINT ["streamlit", "run", "app/main.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# CHANGED: 'app/main.py' -> 'main.py' because the file is in the root of WORKDIR
+ENTRYPOINT ["streamlit", "run", "main.py", "--server.port=8501", "--server.address=0.0.0.0"]

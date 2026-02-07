@@ -101,8 +101,10 @@ class User:
         """
         # 4. Simple Hybrid Re-ranking
         # This blends your User-Match (Similarity) with Global Popularity
+        #
         alpha = 0.6  # Weight for Similarity (0.0 to 1.0)
         beta = 0.4  # Weight for Popularity (0.0 to 1.0)
+
         search_k = top_k * 5  # Big for exploring more nearest anime
 
         if not hasattr(self, "embeddings"):
@@ -157,6 +159,9 @@ class User:
             weighted_pop = (global_score * 0.8) + (popularity_factor * 0.2)
             # 4. Final Blend
             entry["final_score"] = (alpha * sim_score) + (beta * weighted_pop)
+
+            # To test
+            # entry["final_score"] += np.random.uniform(0, 0.05)
 
         # Sort by the final blended score
         unique_anime_entries.sort(key=lambda x: x.get("final_score", 0), reverse=True)
