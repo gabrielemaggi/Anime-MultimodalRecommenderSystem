@@ -414,7 +414,10 @@ with st.sidebar:
                     with st.expander("Advanced Tuning"):
                         st.session_state.filter_mode = st.radio(
                             "Filter Mode",
-                            ["append", "move"],
+                            [
+                                "Aggiungi anime",
+                                "Influenza gli altri verso la richiesta",
+                            ],
                             index=0 if st.session_state.filter_mode == "append" else 1,
                         )
                         st.session_state.filter_magnitude = st.slider(
@@ -427,7 +430,9 @@ with st.sidebar:
 
             # Text Goal Mode
             elif st.session_state.filter_type == "text":
-                st.markdown("**💬 Describe Your Preferences**")
+                st.markdown(
+                    "**💬 Describe Your Preferences** (Use generes and studio keyword)"
+                )
                 st.caption(
                     "Example: 'I want a Romance anime, in the style of mappa studio'"
                 )
