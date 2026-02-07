@@ -234,9 +234,9 @@ OUTPUT_FILE = "./Embeddings/attention_recs_output_with_metrics.jsonl"
 ERROR_LOG = "./Embeddings/attention_processing_errors.log"
 CHUNK_SIZE = 1000  # Smaller chunks for safety
 GC_FREQUENCY = 100  # Garbage collect every N users
-TOP_K = 30  # Number of recommendations to generate
+TOP_K = 10  # Number of recommendations to generate
 EVAL_K = 10  # K for Precision@k and Recall@k evaluation
-TRAIN_SPLIT = 0.5  # 50% for training, 50% for testing
+TRAIN_SPLIT = 0.8  # 50% for training, 50% for testing
 
 
 @contextmanager
@@ -323,7 +323,17 @@ def split_watchlist(watchlist, train_ratio=0.5, min_items=5):
     train_list = shuffled[:split_point]
     test_list = shuffled[split_point:]
 
-    return train_list, test_list
+    for anime in test_list:
+        if anime[1] < 6:
+            test_list.remove(anime)
+
+    # opzionale riordinare test
+    test_list.sort(key=lambda x: x[1], reverse=True)
+
+    if len(test_list) < EVAL_K:
+        return train_list, []
+
+    return train_list, test_list[:EVAL_K]
 
 
 def calculate_user_metrics(recommendations, ground_truth, k=10):
