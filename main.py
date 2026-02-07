@@ -125,7 +125,7 @@ if "filter_magnitude" not in st.session_state:
 if "cards_per_row" not in st.session_state:
     st.session_state.cards_per_row = 4
 if "top_k_val" not in st.session_state:
-    st.session_state.top_k_val = 12
+    st.session_state.top_k_val = 30
 if "text_goal" not in st.session_state:
     st.session_state.text_goal = ""
 if "synopsis_text" not in st.session_state:
