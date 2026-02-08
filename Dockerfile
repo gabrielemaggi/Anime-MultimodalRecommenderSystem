@@ -30,4 +30,4 @@ RUN echo "=== CONTENTS OF /app ===" && \
 HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
 
 # Command to run the application
-ENTRYPOINT ["streamlit", "run", "main.py", "--server.port=8501", "--server.address=0.0.0.0"]
+ENTRYPOINT ["streamlit", "run", "main_auth.py", "--server.port=8501", "--server.address=0.0.0.0"]
