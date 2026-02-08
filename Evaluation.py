@@ -5,6 +5,7 @@ from collections import Counter
 
 import numpy as np
 import pandas as pd
+from scipy.spatial.distance import cosine
 from tqdm import tqdm
 
 from Libs.indexing_db import Indexing
@@ -17,10 +18,13 @@ RECOMMENDATIONS_FILE = "./Embeddings/recommendations_output.jsonl"
 ERROR_LOG = "./Embeddings/evaluation_errors.log"
 
 TRAIN_SPLIT = 0.8  # 80% train, 20% test
-TOP_K_RECOMMENDATIONS = 20
-EVAL_K = 10  # Evaluate Recall@50 and Hit@50
+TOP_K_RECOMMENDATIONS = 50  # Generate top-50 recommendations
+EVAL_K_VALUES = [20, 25, 30, 40, 50]  # Test multiple k values for Recall@k and Hit@k
 MIN_ITEMS_FOR_SPLIT = 20  # Minimum items needed to create train/test split
 MIN_TEST_SCORE = 6  # Only include test items with score >= 6
+FIXED_TEST_SIZE = 20  # Fixed number of test items per user
+NEAR = True  # True for calculating metrics using cosine similarity
+SIMILARITY_THRESHOLD = 0.7  # Threshold for similarity between items
 
 CHUNK_SIZE = 1000
 GC_FREQUENCY = 100
@@ -53,12 +57,12 @@ def get_processed_users():
     return processed
 
 
-def split_watchlist(watchlist, train_ratio=0.8, min_items=10, min_test_score=6):
+def split_watchlist(watchlist, fixed_test_size=5, min_items=20, min_test_score=6):
     """
-    Split watchlist into train and test sets.
+    Split watchlist into train and test sets with FIXED test size.
 
     :param watchlist: List of [anime_id, score] pairs
-    :param train_ratio: Ratio for training (default 0.8)
+    :param fixed_test_size: Fixed number of items in test set
     :param min_items: Minimum items required to split
     :param min_test_score: Minimum score for test items
     :return: (train_list, test_list) or (watchlist, []) if too few items
@@ -66,22 +70,26 @@ def split_watchlist(watchlist, train_ratio=0.8, min_items=10, min_test_score=6):
     if len(watchlist) < min_items:
         return watchlist, []
 
+    # Filter items with score >= min_test_score (eligible for test set)
+    eligible_test = [item for item in watchlist if item[1] >= min_test_score]
+
+    # If not enough eligible items, return all as training
+    if len(eligible_test) < fixed_test_size:
+        return watchlist, []
+
     # Shuffle for randomness
     np.random.seed(42)
-    shuffled = watchlist.copy()
-    np.random.shuffle(shuffled)
+    shuffled_eligible = eligible_test.copy()
+    np.random.shuffle(shuffled_eligible)
 
-    # Split
-    split_point = int(len(shuffled) * train_ratio)
-    train_list = shuffled[:split_point]
-    test_list = shuffled[split_point:]
+    # Take exactly fixed_test_size items for test
+    test_list = shuffled_eligible[:fixed_test_size]
 
-    # Filter test set by minimum score
-    test_list = [item for item in test_list if item[1] >= min_test_score]
+    # Everything else goes to training (including low-scored items)
+    test_ids = set(item[0] for item in test_list)
+    train_list = [item for item in watchlist if item[0] not in test_ids]
 
-    # If test set too small, return all as training
-    if len(test_list) < 5:
-        return watchlist, []
+    print(len(train_list))
 
     return train_list, test_list
 
@@ -108,9 +116,7 @@ def generate_recommendations():
     print("GENERATING RECOMMENDATIONS (NO METRICS)")
     print("=" * 70)
     print(f"Output: {RECOMMENDATIONS_FILE}")
-    print(
-        f"Train Split: {TRAIN_SPLIT * 100:.0f}% | Test Split: {(1 - TRAIN_SPLIT) * 100:.0f}%"
-    )
+    print(f"Fixed Test Size: {FIXED_TEST_SIZE} items per user")
     print(f"Recommendations: Top-{TOP_K_RECOMMENDATIONS}")
 
     # Create output directory
@@ -170,10 +176,10 @@ def generate_recommendations():
                     skipped += 1
                     continue
 
-                # Split into train and test
+                # Split into train and test with FIXED test size
                 train_watchlist, test_watchlist = split_watchlist(
                     full_watchlist,
-                    train_ratio=TRAIN_SPLIT,
+                    fixed_test_size=FIXED_TEST_SIZE,
                     min_items=MIN_ITEMS_FOR_SPLIT,
                     min_test_score=MIN_TEST_SCORE,
                 )
@@ -268,6 +274,133 @@ def calculate_hit_at_k(recommendations, ground_truth, k):
     return 1.0 if len(top_k_recs.intersection(relevant_items)) > 0 else 0.0
 
 
+def calculate_ndcg_at_k(recommendations, test_watchlist, k):
+    """
+    Calculate NDCG@k (Normalized Discounted Cumulative Gain)
+
+    Measures ranking quality by considering:
+    1. Whether relevant items are in top-k
+    2. WHERE they are ranked (higher = better)
+    3. HOW relevant they are (based on user scores)
+
+    :param recommendations: List of recommended anime IDs (ordered by rank)
+    :param test_watchlist: List of [anime_id, score] pairs from test set
+    :param k: Cutoff position
+    :return: NDCG@k score (0-1, higher is better)
+    """
+    if not test_watchlist or not recommendations:
+        return 0.0
+
+    # Create relevance dictionary: {anime_id: user_score}
+    relevance = {int(item[0]): float(item[1]) for item in test_watchlist}
+
+    # Calculate DCG@k (Discounted Cumulative Gain)
+    dcg = 0.0
+    for i, rec_id in enumerate(recommendations[:k]):
+        if rec_id in relevance:
+            # Gain at position i (0-indexed)
+            # Discount by position: log2(i+2) because positions start at 1
+            gain = relevance[rec_id]
+            discount = np.log2(
+                i + 2
+            )  # i+2 because: position 0 -> log2(2), position 1 -> log2(3), etc.
+            dcg += gain / discount
+
+    # Calculate IDCG@k (Ideal DCG - best possible ranking)
+    # Sort test items by score (descending) and calculate ideal DCG
+    sorted_scores = sorted(relevance.values(), reverse=True)
+    idcg = 0.0
+    for i, score in enumerate(sorted_scores[:k]):
+        idcg += score / np.log2(i + 2)
+
+    # Normalize: NDCG = DCG / IDCG
+    if idcg == 0.0:
+        return 0.0
+
+    return dcg / idcg
+
+
+def calculate_near_hit_at_k(
+    recommendations, test_items, k, indexing, similarity_threshold=0.5
+):
+    """
+    Near-Hit@k: Did we recommend at least one item similar to test items?
+
+    This is a BINARY metric (like Hit@k) but with similarity tolerance.
+
+    :param recommendations: List of recommended anime IDs (ordered)
+    :param test_items: List of test anime IDs
+    :param k: Cutoff position
+    :param embedding_dict: Dict mapping anime_id -> embedding vector
+    :param similarity_threshold: Minimum cosine similarity to count as "similar"
+    :return: 1.0 if found similar item, 0.0 otherwise
+    """
+    top_k_recs = recommendations[:k]
+
+    for rec_id in top_k_recs:
+        # Skip if recommendation has no embedding
+
+        rec_embedding = indexing.get_db_embedding_by_id(int(rec_id))
+
+        for test_id in test_items:
+            test_embedding = indexing.get_db_embedding_by_id(int(test_id))
+
+            # Calculate cosine similarity
+            similarity = 1 - cosine(rec_embedding, test_embedding)
+
+            # If similar enough, count as near-hit
+            if similarity >= similarity_threshold:
+                return 1.0
+
+    return 0.0
+
+
+def calculate_near_recall_at_k(
+    recommendations, test_items, k, indexing, similarity_threshold=0.5
+):
+    """
+    Near-Recall@k: What % of test items have a similar item in top-k?
+
+    This extends Recall@k with similarity tolerance.
+
+    :param recommendations: List of recommended anime IDs (ordered)
+    :param test_items: List of test anime IDs
+    :param k: Cutoff position
+    :param embedding_dict: Dict mapping anime_id -> embedding vector
+    :param similarity_threshold: Minimum cosine similarity to count as "similar"
+    :return: Proportion of test items with similar recommendation (0-1)
+    """
+    if not test_items:
+        return 0.0
+
+    top_k_recs = recommendations[:k]
+    matched_test_items = 0
+
+    for test_id in test_items:
+        # Skip if test item has no embedding
+
+        test_embedding = indexing.get_db_embedding_by_id(int(test_id))
+        found_similar = False
+
+        for rec_id in top_k_recs:
+            # Skip if recommendation has no embedding
+
+            rec_embedding = indexing.get_db_embedding_by_id(int(rec_id))
+
+            # Calculate cosine similarity
+            similarity = 1 - cosine(rec_embedding, test_embedding)
+
+            # If similar enough, this test item is "matched"
+            if similarity >= similarity_threshold:
+                found_similar = True
+                break
+
+        if found_similar:
+            matched_test_items += 1
+
+    return matched_test_items / len(test_items)
+
+
 def calculate_catalog_coverage(recommendations, full_catalog):
     """Percentage of catalog items recommended at least once"""
     recommended = set()
@@ -341,20 +474,24 @@ def calculate_novelty(recommendations, training_data):
 
 def evaluate_from_file():
     """
-    Load the JSONL file and calculate ALL metrics.
+    Load the JSONL file and calculate ALL metrics at MULTIPLE K VALUES.
 
-    Accuracy metrics (Recall@k, Hit@k):
+    Accuracy metrics (Recall@k, Hit@k, NDCG@k):
     - Use recommendations_from_train vs test_watchlist
+    - Evaluate at multiple k values
 
     Beyond-accuracy metrics (Coverage, Entropy, Novelty):
     - Use recommendations_from_full
     - Only use training data from the SAME users in the recommendations file
     """
+    index = Indexing()
+    index.load_vector_database()
 
     print("\n" + "=" * 70)
     print("EVALUATING METRICS FROM FILE")
     print("=" * 70)
     print(f"Input: {RECOMMENDATIONS_FILE}")
+    print(f"Testing k values: {EVAL_K_VALUES}")
 
     if not os.path.exists(RECOMMENDATIONS_FILE):
         print(f"\n✗ ERROR: File not found: {RECOMMENDATIONS_FILE}")
@@ -363,9 +500,12 @@ def evaluate_from_file():
 
     print(f"\n[1/5] Loading data from file...")
 
-    # Storage for metrics calculation
-    recall_scores = []
-    hit_scores = []
+    # Storage for metrics calculation at different k values
+    metrics_by_k = {
+        k: {"recall": [], "hit": [], "ndcg": [], "near_recall": [], "near_hit": []}
+        for k in EVAL_K_VALUES
+    }
+
     recommendations_from_train = {}  # For accuracy metrics
     recommendations_from_full = {}  # For beyond-accuracy metrics
     user_ids_in_file = []  # Track which users are in the file
@@ -381,7 +521,10 @@ def evaluate_from_file():
                 user_ids_in_file.append(user_id)
 
                 # Extract data
-                test_anime_ids = [item[0] for item in data["test_watchlist"]]
+                test_watchlist = data[
+                    "test_watchlist"
+                ]  # Keep full [id, score] pairs for NDCG
+                test_anime_ids = [item[0] for item in test_watchlist]
                 recs_train = data["recommendations_from_train"]
                 recs_full = data["recommendations_from_full"]
 
@@ -389,12 +532,36 @@ def evaluate_from_file():
                 recommendations_from_train[user_id] = recs_train
                 recommendations_from_full[user_id] = recs_full
 
-                # Calculate accuracy metrics (using train recommendations vs test set)
-                recall = calculate_recall_at_k(recs_train, test_anime_ids, k=EVAL_K)
-                hit = calculate_hit_at_k(recs_train, test_anime_ids, k=EVAL_K)
+                # Calculate accuracy metrics for each k value
+                for k in EVAL_K_VALUES:
+                    recall = calculate_recall_at_k(recs_train, test_anime_ids, k=k)
+                    hit = calculate_hit_at_k(recs_train, test_anime_ids, k=k)
+                    ndcg = calculate_ndcg_at_k(recs_train, test_watchlist, k=k)
 
-                recall_scores.append(recall)
-                hit_scores.append(hit)
+                    if NEAR:
+                        near_recall = calculate_near_recall_at_k(
+                            recs_train,
+                            test_anime_ids,
+                            k=k,
+                            indexing=index,
+                            similarity_threshold=SIMILARITY_THRESHOLD,
+                        )
+                        near_hit = calculate_near_hit_at_k(
+                            recs_train,
+                            test_anime_ids,
+                            k=k,
+                            indexing=index,
+                            similarity_threshold=SIMILARITY_THRESHOLD,
+                        )
+                    else:
+                        near_hit = 0.0
+                        near_recall = 0.0
+
+                    metrics_by_k[k]["recall"].append(recall)
+                    metrics_by_k[k]["hit"].append(hit)
+                    metrics_by_k[k]["ndcg"].append(ndcg)
+                    metrics_by_k[k]["near_recall"].append(near_recall)
+                    metrics_by_k[k]["near_hit"].append(near_hit)
 
             except Exception as e:
                 print(f"Error loading line: {e}")
@@ -402,11 +569,27 @@ def evaluate_from_file():
 
     print(f"       Loaded {user_count} users")
 
-    # Calculate accuracy metrics
-    print(f"\n[2/5] Calculating accuracy metrics...")
+    # Calculate average metrics for each k
+    print(f"\n[2/5] Calculating accuracy metrics at multiple k values...")
     print(f"       Using: recommendations_from_train vs test_watchlist")
-    avg_recall = np.mean(recall_scores) if recall_scores else 0.0
-    avg_hit = np.mean(hit_scores) if hit_scores else 0.0
+
+    avg_metrics_by_k = {}
+    for k in EVAL_K_VALUES:
+        avg_metrics_by_k[k] = {
+            "recall": np.mean(metrics_by_k[k]["recall"])
+            if metrics_by_k[k]["recall"]
+            else 0.0,
+            "hit": np.mean(metrics_by_k[k]["hit"]) if metrics_by_k[k]["hit"] else 0.0,
+            "ndcg": np.mean(metrics_by_k[k]["ndcg"])
+            if metrics_by_k[k]["ndcg"]
+            else 0.0,
+            "near_recall": np.mean(metrics_by_k[k]["near_recall"])
+            if metrics_by_k[k]["near_recall"]
+            else 0.0,
+            "near_hit": np.mean(metrics_by_k[k]["near_hit"])
+            if metrics_by_k[k]["near_hit"]
+            else 0.0,
+        }
 
     # Load ONLY the training data for users in the recommendations file
     print(f"\n[3/5] Loading training data for {len(user_ids_in_file)} users...")
@@ -455,11 +638,37 @@ def evaluate_from_file():
     print("📊 EVALUATION RESULTS")
     print("=" * 70)
 
-    print(f"\n🎯 ACCURACY METRICS")
+    print(f"\n🎯 ACCURACY METRICS (at different k values)")
     print(f"   Source: recommendations_from_train vs test_watchlist")
-    print(f"   Users:           {len(recall_scores)}")
-    print(f"   Recall@{EVAL_K}:       {avg_recall:.4f} ({avg_recall * 100:.2f}%)")
-    print(f"   Hit@{EVAL_K}:          {avg_hit:.4f} ({avg_hit * 100:.2f}%)")
+    print(f"   Users:  {user_count}")
+    print(f"   Fixed test size: {FIXED_TEST_SIZE} items per user")
+    print("\n   " + "-" * 60)
+    print(
+        f"   {'k':<6} {'Recall@k':<18} {'Hit@k':<18} {'NDCG@k':<18} {'Near Recall@k':<18} {'Near Hit@k':<18}"
+    )
+    print(f"   " + "-" * 100)
+
+    for k in EVAL_K_VALUES:
+        metrics = avg_metrics_by_k[k]
+
+        # Prepare strings for each column to make the final f-string readable
+        rec_str = f"{metrics['recall']:.4f} ({metrics['recall'] * 100:5.2f}%)"
+        hit_str = f"{metrics['hit']:.4f} ({metrics['hit'] * 100:5.2f}%)"
+        ndcg_str = f"{metrics['ndcg']:.4f} ({metrics['ndcg'] * 100:5.2f}%)"
+        n_rec_str = (
+            f"{metrics['near_recall']:.4f} ({metrics['near_recall'] * 100:5.2f}%)"
+        )
+        n_hit_str = f"{metrics['near_hit']:.4f} ({metrics['near_hit'] * 100:5.2f}%)"
+
+        print(
+            f"   {k:<6} "
+            f"{rec_str:<18} "
+            f"{hit_str:<18} "
+            f"{ndcg_str:<18} "
+            f"{n_rec_str:<18} "
+            f"{n_hit_str:<18}"
+        )
+    print(f"   " + "-" * 100)
 
     print(f"\n🌟 BEYOND-ACCURACY METRICS")
     print(f"   Source: recommendations_from_full")
@@ -473,13 +682,14 @@ def evaluate_from_file():
     print(f"   Novelty Score:    {novelty:.4f}")
 
     print("\n" + "=" * 70)
+    print("\n💡 METRIC INTERPRETATIONS:")
+    print("   Recall@k:  % of relevant items found in top-k")
+    print("   Hit@k:     % of users with ≥1 relevant item in top-k")
+    print("   NDCG@k:    Ranking quality (0-1, considers position + scores)")
+    print("=" * 70)
 
     return {
-        "accuracy": {
-            "recall": avg_recall,
-            "hit": avg_hit,
-            "n_users": len(recall_scores),
-        },
+        "accuracy_by_k": avg_metrics_by_k,
         "beyond_accuracy": {
             "catalog_coverage": catalog_coverage,
             "shannon_entropy": shannon_entropy,
@@ -541,9 +751,16 @@ def main():
         print("RECOMMENDATION EVALUATION TOOL")
         print("=" * 70)
         print("\nUsage:")
-        print("  python script.py generate   - Generate recommendations (resumable)")
-        print("  python script.py evaluate   - Evaluate from saved file")
-        print("  python script.py info       - Show file information")
+        print(
+            "  python Evaluation.py generate   - Generate recommendations (resumable)"
+        )
+        print("  python Evaluation.py evaluate   - Evaluate from saved file")
+        print("  python Evaluation.py info       - Show file information")
+        print("\nConfiguration:")
+        print(f"  TOP_K_RECOMMENDATIONS: {TOP_K_RECOMMENDATIONS}")
+        print(f"  EVAL_K_VALUES: {EVAL_K_VALUES}")
+        print(f"  FIXED_TEST_SIZE: {FIXED_TEST_SIZE}")
+        print(f"  MIN_TEST_SCORE: {MIN_TEST_SCORE}")
         print("\nFile location: " + RECOMMENDATIONS_FILE)
         print("=" * 70)
         return
