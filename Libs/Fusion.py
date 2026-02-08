@@ -1,6 +1,8 @@
-import numpy as np
-from typing import Dict, List, Optional, Union, Tuple
 from collections import defaultdict
+from typing import Dict, List, Optional, Tuple, Union
+
+import numpy as np
+
 
 class Fusion:
     def __init__(self, anime_embeddings: List[Dict]):
@@ -29,18 +31,34 @@ class Fusion:
                 if not isinstance(item_dict, dict):
                     raise TypeError(f"Expected dict, got {type(item_dict)}")
                 if len(item_dict) != 1:
-                    raise ValueError(f"Each dict must have exactly 1 key, got {len(item_dict)}")
+                    raise ValueError(
+                        f"Each dict must have exactly 1 key, got {len(item_dict)}"
+                    )
                 item_id = next(iter(item_dict.keys()))
                 items.append((item_id, item_dict[item_id]))
 
         for item_id, embeddings in items:
             if len(embeddings) != 3:
-                raise ValueError(f"Expected 3 embeddings per item, got {len(embeddings)} for ID {item_id}")
+                raise ValueError(
+                    f"Expected 3 embeddings per item, got {len(embeddings)} for ID {item_id}"
+                )
 
             # Handle double-nested format [[vec]] vs [vec]
-            syn = np.array(embeddings[0][0] if isinstance(embeddings[0], list) and len(embeddings[0]) == 1 else embeddings[0])
-            vis = np.array(embeddings[1][0] if isinstance(embeddings[1], list) and len(embeddings[1]) == 1 else embeddings[1])
-            tab = np.array(embeddings[2][0] if isinstance(embeddings[2], list) and len(embeddings[2]) == 1 else embeddings[2])
+            syn = np.array(
+                embeddings[0][0]
+                if isinstance(embeddings[0], list) and len(embeddings[0]) == 1
+                else embeddings[0]
+            )
+            vis = np.array(
+                embeddings[1][0]
+                if isinstance(embeddings[1], list) and len(embeddings[1]) == 1
+                else embeddings[1]
+            )
+            tab = np.array(
+                embeddings[2][0]
+                if isinstance(embeddings[2], list) and len(embeddings[2]) == 1
+                else embeddings[2]
+            )
 
             self.item_ids.append(str(item_id))
             self.synopsis_embeddings.append(syn)
@@ -65,22 +83,32 @@ class Fusion:
         """Safely get feature dimension for 1D or 2D arrays."""
         return emb.shape[1] if emb.ndim == 2 else emb.shape[0]
 
-    def concatenate(self, as_list: bool = False) -> Union[Dict[str, np.ndarray], List[Dict]]:
+    def concatenate(
+        self, as_list: bool = False
+    ) -> Union[Dict[str, np.ndarray], List[Dict]]:
         result = {}
         for i, item_id in enumerate(self.item_ids):
-            result[item_id] = np.concatenate([
-                self.synopsis_embeddings[i],
-                self.visual_embeddings[i],
-                self.tabular_embeddings[i]
-            ])
+            result[item_id] = np.concatenate(
+                [
+                    self.synopsis_embeddings[i],
+                    self.visual_embeddings[i],
+                    self.tabular_embeddings[i],
+                ]
+            )
 
-        return [{'id': k, 'embedding': v} for k, v in result.items()] if as_list else result
+        return (
+            [{"id": k, "embedding": v} for k, v in result.items()]
+            if as_list
+            else result
+        )
 
-    def mean_fusion(self, as_list: bool = False) -> Union[Dict[str, np.ndarray], List[Dict]]:
+    def mean_fusion(
+        self, as_list: bool = False
+    ) -> Union[Dict[str, np.ndarray], List[Dict]]:
         dims = [
             self._get_embedding_dim(self.synopsis_embeddings),
             self._get_embedding_dim(self.visual_embeddings),
-            self._get_embedding_dim(self.tabular_embeddings)
+            self._get_embedding_dim(self.tabular_embeddings),
         ]
         if len(set(dims)) != 1:
             raise ValueError(
@@ -90,24 +118,28 @@ class Fusion:
 
         result = {}
         for i, item_id in enumerate(self.item_ids):
-            stacked = np.stack([
-                self.synopsis_embeddings[i],
-                self.visual_embeddings[i],
-                self.tabular_embeddings[i]
-            ])
+            stacked = np.stack(
+                [
+                    self.synopsis_embeddings[i],
+                    self.visual_embeddings[i],
+                    self.tabular_embeddings[i],
+                ]
+            )
             result[item_id] = np.mean(stacked, axis=0)
 
-        return [{'id': k, 'embedding': v} for k, v in result.items()] if as_list else result
+        return (
+            [{"id": k, "embedding": v} for k, v in result.items()]
+            if as_list
+            else result
+        )
 
     def weighted_average_fusion(
-        self,
-        weights: Optional[List[float]] = None,
-        as_list: bool = False
+        self, weights: Optional[List[float]] = None, as_list: bool = False
     ) -> Union[Dict[str, np.ndarray], List[Dict]]:
         dims = [
             self._get_embedding_dim(self.synopsis_embeddings),
             self._get_embedding_dim(self.visual_embeddings),
-            self._get_embedding_dim(self.tabular_embeddings)
+            self._get_embedding_dim(self.tabular_embeddings),
         ]
         if len(set(dims)) != 1:
             raise ValueError(
@@ -116,7 +148,7 @@ class Fusion:
             )
 
         if weights is None:
-            weights = [1/3, 1/3, 1/3]
+            weights = [1 / 3, 1 / 3, 1 / 3]
         else:
             if len(weights) != 3:
                 raise ValueError(f"Expected 3 weights, got {len(weights)}")
@@ -125,34 +157,46 @@ class Fusion:
                 raise ValueError("Weights sum to zero")
             weights = [w / total for w in weights]
 
-        print(f"Using weights: synopsis={weights[0]:.2f}, visual={weights[1]:.2f}, tabular={weights[2]:.2f}")
+        print(
+            f"Using weights: synopsis={weights[0]:.2f}, visual={weights[1]:.2f}, tabular={weights[2]:.2f}"
+        )
 
         result = {}
         for i, item_id in enumerate(self.item_ids):
             result[item_id] = (
-                weights[0] * self.synopsis_embeddings[i] +
-                weights[1] * self.visual_embeddings[i] +
-                weights[2] * self.tabular_embeddings[i]
+                weights[0] * self.synopsis_embeddings[i]
+                + weights[1] * self.visual_embeddings[i]
+                + weights[2] * self.tabular_embeddings[i]
             )
 
-        return [{'id': k, 'embedding': v} for k, v in result.items()] if as_list else result
+        return (
+            [{"id": k, "embedding": v} for k, v in result.items()]
+            if as_list
+            else result
+        )
 
-    def get_embedding_by_id(self, item_id: str, modality: str = 'all') -> np.ndarray:
+    def get_embedding_by_id(self, item_id: str, modality: str = "all") -> np.ndarray:
         if item_id not in self._id_to_idx:
-            raise ValueError(f"Item ID '{item_id}' not found. Available IDs: {list(self._id_to_idx.keys())[:5]}...")
+            raise ValueError(
+                f"Item ID '{item_id}' not found. Available IDs: {list(self._id_to_idx.keys())[:5]}..."
+            )
 
         idx = self._id_to_idx[item_id]
-        if modality == 'synopsis':
+        if modality == "synopsis":
             return self.synopsis_embeddings[idx]
-        elif modality == 'visual':
+        elif modality == "visual":
             return self.visual_embeddings[idx]
-        elif modality == 'tabular':
+        elif modality == "tabular":
             return self.tabular_embeddings[idx]
-        elif modality == 'all':
-            return np.concatenate([
-                self.synopsis_embeddings[idx],
-                self.visual_embeddings[idx],
-                self.tabular_embeddings[idx]
-            ])
+        elif modality == "all":
+            return np.concatenate(
+                [
+                    self.synopsis_embeddings[idx],
+                    self.visual_embeddings[idx],
+                    self.tabular_embeddings[idx],
+                ]
+            )
         else:
-            raise ValueError(f"Unknown modality '{modality}'. Choose from: 'synopsis', 'visual', 'tabular', 'all'")
+            raise ValueError(
+                f"Unknown modality '{modality}'. Choose from: 'synopsis', 'visual', 'tabular', 'all'"
+            )

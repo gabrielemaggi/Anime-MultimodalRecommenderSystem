@@ -320,7 +320,8 @@ class Indexing:
             else:
                 raise ValueError(f"Unsupported fusion method: {method}")
 
-            return fused
+            fused_vector = list(fused.values())[0]
+            return fused_vector
 
     def _create_vector_database(
         self, fused_embeddings: np.ndarray, anime_ids: List[str]
@@ -586,6 +587,7 @@ class Indexing:
             List of similar anime with metadata and similarity scores
         """
         query_embedding = self.encode_by_id(anime_id)
+
         return self.search(query_embedding, top_k=top_k)
 
     def search_by_data(
@@ -603,6 +605,7 @@ class Indexing:
             List of similar anime with metadata and similarity scores
         """
         query_embedding = self.encode_from_data(data, image_path=image_path)
+
         return self.search(query_embedding, top_k=top_k)
 
     def get_db_embedding_by_id(self, id):
@@ -674,3 +677,7 @@ class Indexing:
             return {k: (v if pd.notnull(v) else None) for k, v in row_dict.items()}
 
         return None
+
+    def get_all_ids(self):
+        df = self._load_dataset()
+        return df["id"].tolist()

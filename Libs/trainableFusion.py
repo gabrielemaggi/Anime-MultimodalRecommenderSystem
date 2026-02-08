@@ -399,7 +399,7 @@ class FusionTrainer:
 
         # RETURN STRUCTURED OUTPUT (MATCHES Fusion CLASS)
         if isinstance(ids, int):
-            print({ids: fused})
+            # print({ids: fused})
             return {"id": ids, "embedding": fused}
         else:
             result = {id_: fused[i] for i, id_ in enumerate(ids)}
@@ -408,7 +408,7 @@ class FusionTrainer:
                 if as_list
                 else result
             )
-            print(out)
+            # print(out)
             return out
 
     def save(self, path: str = "fusion_model.pt"):
