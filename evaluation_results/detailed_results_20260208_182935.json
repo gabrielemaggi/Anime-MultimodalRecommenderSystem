@@ -1,0 +1,934 @@
+[
+  {
+    "username": "symonx99",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Cars"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The top recommendation, Sword Art Online Movie: Ordinal Scale, is a direct continuation of the popular Sword Art Online series that the user already enjoys. It maintains the same themes and characters while introducing new elements like Augmented Reality. Other recommendations, such as Durarara!!x2 Ten and Initial D Extra Stage 2, also align closely with genres and themes preferred by the user.",
+      "explanation": "The recommendations are based on the user's history of watching high-action, often supernatural or sci-fi series that involve complex characters and immersive worlds. The movies and specials recommended continue those trends while introducing slight variations in format or setting that still appeal to similar interests.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "All recommendations fit squarely within the user's stated preference for Action, Adventure, Game, Mystery, Sci-Fi, and Supernatural genres. Each title offers a blend of these elements while adding new twists like AR technology or expanded story arcs."
+    },
+    "timestamp": "2026-02-08T18:30:10.661196"
+  },
+  {
+    "username": "symonx99",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Sci-Fi"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 3,
+      "reasoning": "The recommendations are a mix of supernatural and slice-of-life themes, which somewhat aligns with Natsume Yuujinchou but diverges significantly from the user's other preferences. While some titles like Sayonara Zetsubou Sensei, Hana to Alice: Satsujin Jiken have elements that might appeal due to their unique storytelling, many others like Jinrui wa Suitai Shimashita and Toradora! are quite different.",
+      "explanation": "The recommendations were generated based on titles with supernatural elements (Natsume Yuujinchou) and slice-of-life themes. However, the inclusion of other genres and styles doesn't align perfectly with the user's stated preferences, leading to a moderate score.",
+      "genre_goal_score": 3,
+      "genre_goal_reasoning": "While some recommendations like Natsume Yuujinchou: Itsuka Yuki no Hi ni match closely in genre (supernatural), others veer into comedy and fantasy. The mix of genres doesn't fully satisfy the user's stated preference for supernatural titles, resulting in a middle-ground score."
+    },
+    "timestamp": "2026-02-08T18:30:42.836470"
+  },
+  {
+    "username": "symonx99",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Action",
+      "Adventure"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommended shows largely fit the user's preferences for supernatural, slice of life, and drama themes. However, some deviations like action-adventure elements in 'D.Gray-man Hallow' slightly lower the score.",
+      "explanation": "These recommendations were chosen based on a strong alignment with the user's previous viewing history of 'Natsume Yuujinchou,' which shares similar genre elements such as supernatural and slice-of-life aspects. Shows like 'ReLIFE: Kanketsu-hen' also fit well into this theme.",
+      "genre_goal_score": 4,
+      "genre_goal_reasoning": "The recommendations align quite closely with the requested genres of supernatural, slice of life, drama, and romance while including a few action-adventure elements which slightly deviate but are still within the broader thematic spectrum."
+    },
+    "timestamp": "2026-02-08T18:31:11.017461"
+  },
+  {
+    "username": "symonx99",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Action",
+      "Romance"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 3,
+      "reasoning": "The recommendations primarily focus on slice-of-life and comedy genres, which are present in the user's history but not exclusively. The inclusion of psychological, drama, fantasy, supernatural, and action elements shows some versatility but may not align perfectly with what the user is looking for.",
+      "explanation": "Based on the user's viewing history, the recommendations aim to provide a mix that includes their past interests in slice-of-life and comedy genres while also introducing different themes such as psychological drama and fantasy. This aims at expanding their horizons within familiar territory but may not perfectly match every preference.",
+      "genre_goal_score": 3,
+      "genre_goal_reasoning": "While the recommendations include a variety of genres that partially align with slice-of-life and comedy, they also introduce other themes like action and fantasy which were not prominently featured in the user's viewing history. This provides a balance but may not fully cater to the primary interests indicated."
+    },
+    "timestamp": "2026-02-08T18:31:40.513142"
+  },
+  {
+    "username": "symonx99",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Shoujo",
+      "Romance",
+      "Military"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 3,
+      "reasoning": "The recommendation includes a mix of action, comedy, drama, and supernatural anime which partially matches the user's preference. However, it lacks some specific themes like school life or magical girl genre that were present in the user's history.",
+      "explanation": "These recommendations are based on popular anime titles from different genres, including 'Made in Abyss' for its unique world-building and action elements; 'Kuroko no Basuke' for basketball-themed sports anime; 'The iDOLM@STER: Cinderella Girls Series' for idol-related content. Other suggestions like 'One Piece', 'Natsume Yuujinchou Roku Specials', and 'Girls & Panzer: Saishuushou' cover a range of genres to cater to the user's diverse tastes, but might not fully align with all specific interests.",
+      "genre_goal_score": 2,
+      "genre_goal_reasoning": "While some recommendations like 'The iDOLM@STER: Cinderella Girls Series' and 'Natsume Yuujinchou Roku Specials' touch on magical girl elements or supernatural themes, many others diverge from the exact genre goals of school life and idol-themed anime. The inclusion of action and sports genres broadens but does not precisely match the user's specific interests."
+    },
+    "timestamp": "2026-02-08T18:32:15.375926"
+  },
+  {
+    "username": "symonx99",
+    "model": "qwen2.5:14b",
+    "genre_goal": null,
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 3,
+      "reasoning": "The recommendations primarily focus on genres and themes like psychological dramas, slice of life, sci-fi, and action which may not fully align with the user's preference for historical epics. However, some titles share thematic elements such as societal issues ('Welcome to N.H.K.') and complex narratives that might resonate.",
+      "explanation": "The recommendations are based on a mix of genre popularity within anime, thematic depth, and cultural relevance, aiming to offer a variety of styles and narratives similar in complexity and storytelling technique but not necessarily matching the historical epic criteria."
+    },
+    "timestamp": "2026-02-08T18:32:39.388401"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Cars"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommended titles are predominantly action, drama, and mystery series, which partially matches the user's interest in 'action', 'drama', and 'mystery'. However, there is a strong representation of anime with unique themes such as economics ('C: The Money of Soul and Possibility Control') or futuristic dystopias ('Shangri-La'), which might not align well with the traditional action-drama preferences.",
+      "explanation": "The recommendations are based on popular titles within the requested genre categories. They range from highly acclaimed series like 'Gintama' to unique, thematic anime that explore complex economic and social issues in dystopian settings. These choices aim to provide a diverse selection that includes both mainstream action-drama content as well as more niche titles.",
+      "genre_goal_score": 3,
+      "genre_goal_reasoning": "While the recommendations include action and drama elements, they also extend beyond these genres into economics, mystery, and science fiction themes. This results in a mixed genre fit where some titles align closely with 'action' and 'drama', while others offer thematic depth that goes slightly off-genre."
+    },
+    "timestamp": "2026-02-08T18:33:11.099941"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Sci-Fi"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommended series share thematic elements such as conspiracy theories, psychological drama, and social commentary, which are present in 'Naruto.' However, they deviate significantly in terms of genre, focusing more on dark narratives and real-world issues.",
+      "explanation": "These recommendations were chosen based on thematic and stylistic similarities to 'Naruto,' such as deep character development and complex storylines. The inclusion of series like 'Erased' and '91 Days' provides a mix of psychological drama, action, and conspiracy themes.",
+      "genre_goal_score": 3,
+      "genre_goal_reasoning": "While the recommendations touch on similar themes to 'Naruto,' they do not align perfectly in terms of genre. The inclusion of series like 'Deadman Wonderland' and 'Phantom: Requiem for the Phantom' introduces darker, more realistic settings which diverge from 'Naruto's' fantasy elements."
+    },
+    "timestamp": "2026-02-08T18:33:39.965963"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Action",
+      "Adventure"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommended titles, such as 'Black Butler: Book of the Atlantic', 'Phantom: Requiem for the Phantom', and '91 Days', share thematic elements like dark fantasy, action, drama, and psychological depth that are similar to the user's favorite anime. However, they diverge slightly in terms of setting (for instance, 'Black Butler' is Victorian-themed while '91 Days' takes place during Prohibition), which might be a minor downside.",
+      "explanation": "These recommendations were based on matching the user's interest in dark themes, action, and psychological depth. They also include supernatural elements and are set within historical contexts similar to their preference for 'Black Butler'.",
+      "genre_goal_score": 4,
+      "genre_goal_reasoning": "The recommendations fit well with the goal genres such as Action, Drama, Psychological, but slightly vary in terms of setting details like historical era. The core thematic elements match very closely."
+    },
+    "timestamp": "2026-02-08T18:34:09.542771"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Action",
+      "Romance"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 3,
+      "reasoning": "The recommended series vary in themes and genres, but none seem to be a perfect fit for 'Vikings'. While some like '91 Days' have historical elements and dark revenge narratives which might appeal to the user, others like 'Princess Mononoke' or 'Neighborhood Stories' diverge significantly from the requested genre.",
+      "explanation": "The recommendations were chosen based on themes of action, drama, and historical settings with a focus on revenge or conflict. However, they do not fully encapsulate the Viking era or similar elements that might appeal to someone interested in 'Vikings'.",
+      "genre_goal_score": 2,
+      "genre_goal_reasoning": "The recommendations do touch upon certain aspects like historical drama and action but fail to capture the essence of Viking-centric themes. They are more aligned with modern revenge narratives, crime dramas, and supernatural elements which aren't directly related to the Viking genre."
+    },
+    "timestamp": "2026-02-08T18:34:38.355910"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Shoujo",
+      "Romance",
+      "Military"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommended anime share thematic elements and genre similarities, such as action, mystery, and thriller. However, they lack certain specifics from the user's history, like not including a romantic comedy or more slice of life content.",
+      "explanation": "These recommendations are based on the user's preference for action, adventure, fantasy, mystery, science fiction, supernatural, drama, and thriller genres. The list includes popular titles that fit these criteria but misses some nuances such as romantic comedy and slice-of-life elements.",
+      "genre_goal_score": 3,
+      "genre_goal_reasoning": "The recommendations align well with the requested action, adventure, fantasy, mystery, sci-fi, supernatural, drama, and thriller genres. However, they do not include any romantic comedy or slice of life content that was also part of the user's preferences."
+    },
+    "timestamp": "2026-02-08T18:35:05.556173"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "qwen2.5:14b",
+    "genre_goal": null,
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommended anime share similar themes and genres with 'Erased', such as mystery, supernatural, psychological thriller, and time travel. They offer a blend of suspenseful narratives and character-driven plots that align well thematically.",
+      "explanation": "These recommendations are based on the user's history with 'Erased'. The selection prioritizes animes featuring intricate mysteries, supernatural elements, and deep psychological themes, which directly correlate to 'Erased' in terms of storytelling style and thematic focus."
+    },
+    "timestamp": "2026-02-08T18:35:27.785578"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Cars"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommended series are highly similar in themes and style, featuring action, drama, and adventure elements. They maintain a balance between supernatural/mystery aspects and realistic character development.",
+      "explanation": "These recommendations were based on the user's history with anime that feature complex narratives, supernatural elements, and rich character development within the realms of mystery and sci-fi. The selected titles match these criteria while varying slightly in their specific themes to provide a diverse set of options.",
+      "genre_goal_score": 4,
+      "genre_goal_reasoning": "The recommendations align closely with the genre goals by including series that incorporate elements of drama, action, mystery, and supernatural genres which are prevalent in the user's previous selections. However, there is slight variation in emphasis on sci-fi, making it a near perfect match."
+    },
+    "timestamp": "2026-02-08T18:35:55.227337"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Sci-Fi"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommended titles are predominantly within the Mystery, Psychological and Supernatural genres, which closely matches the user's interest in psychological thrillers. These anime series are known for their intricate plot twists, complex characters and supernatural elements that align well with a viewer interested in this genre.",
+      "explanation": "These recommendations were generated based on the user's history of watching anime titles such as 'Serial Experiments Lain', which is renowned for its deep exploration of psychological themes. The selected titles maintain thematic consistency while offering diverse storytelling, ensuring a good fit for someone who enjoys exploring complex narratives and supernatural mysteries.",
+      "genre_goal_score": 4,
+      "genre_goal_reasoning": "The recommendations largely align with the user's preferred genre as they include works that are deeply rooted in psychological suspense and mystery. Titles like 'Danganronpa 3: The End of Hope's Peak High School - Future Arc' and 'xxxHOLiC' offer a blend of supernatural elements and deep, introspective storytelling that closely match the requested genres."
+    },
+    "timestamp": "2026-02-08T18:36:25.727687"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Action",
+      "Adventure"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommended anime share thematic elements, such as supernatural and psychological themes in 'xxxHOLiC', 'Mob Psycho 100' and 'Danganronpa 3: The End of Kibougamine Gakuen - Mirai-hen'. However, the absence of historical or samurai genres from the recommendations lowers their overall fit.",
+      "explanation": "The recommendation engine prioritized supernatural and psychological themes based on 'xxxHOLiC', while also considering user interest in comedy and action ('Gintama'). The top picks include a mix of mystery, horror, and slice-of-life elements to cater to diverse tastes within the genre.",
+      "genre_goal_score": 3,
+      "genre_goal_reasoning": "While the recommendations cover supernatural and psychological genres well, they lack historical or samurai content as requested. This limits alignment with the user's stated preferences."
+    },
+    "timestamp": "2026-02-08T18:36:54.610255"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Action",
+      "Romance"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 3,
+      "reasoning": "The recommendations are a mix of action, comedy, and fantasy series which partially aligns with the user's history in 'My Hero Academia', but also introduces diverse themes and styles. The score is moderate due to thematic differences while maintaining some genre similarity.",
+      "explanation": "Recommendations were based on the user's interest in My Hero Academia, focusing on action, comedy, and fantasy series which share similar characteristics such as heroics, adventure, and strong narrative elements.",
+      "genre_goal_score": 3,
+      "genre_goal_reasoning": "The recommendations cover a range of genres including action, comedy, fantasy, and historical that partly match the user's interest in My Hero Academia but also extend into other areas which may not perfectly fit their initial preferences."
+    },
+    "timestamp": "2026-02-08T18:37:21.334527"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "qwen2.5:14b",
+    "genre_goal": [
+      "Shoujo",
+      "Romance",
+      "Military"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommended shows share similar themes of supernatural abilities and slice-of-life elements, as seen in 'Mob Psycho 100' and 'The Disastrous Life of Saiki K.' Both series have a strong comedic tone with unexpected twists that cater to the user's interest in non-linear storytelling.",
+      "explanation": "These recommendations are based on the user's history with shows like 'Non Non Biyori', which includes slice-of-life themes and an emphasis on school life. The selected titles also incorporate supernatural elements, aligning well with the user's preference for unique thematic content beyond everyday scenarios.",
+      "genre_goal_score": 4,
+      "genre_goal_reasoning": "The recommendations are highly aligned with the requested genres of Slice of Life, Comedy, Fantasy, and Supernatural, offering a good mix that satisfies both the slice-of-life aspect as well as more fantastical elements."
+    },
+    "timestamp": "2026-02-08T18:37:49.897651"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "qwen2.5:14b",
+    "genre_goal": null,
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 3,
+      "reasoning": "The recommended titles cover a variety of genres and themes such as supernatural, comedy, action, and drama which have some thematic or genre similarity to 'Kanojo to Kanojo no Neko' but lack the specific focus on human-cat relationship and slice-of-life elements.",
+      "explanation": "These recommendations were made based on the user's interest in a unique story involving a human and their cat from different perspectives. However, since there is no direct match for such an intricate blend of drama and psychological themes with a clear narrative about the bond between humans and animals, the system provided a range of titles that share thematic elements like supernatural occurrences, school life, or comedy-drama."
+    },
+    "timestamp": "2026-02-08T18:38:15.306161"
+  },
+  {
+    "username": "symonx99",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Cars"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 5,
+      "reasoning": "Given the user's history of watching 'Neon Genesis Evangelion: The End of Evangelion', 'Sayonara Zetsubou Sensei', and 'Gungrave' (all dark, complex, and often visually striking anime with mature themes), I'm recommending 'Natsume Yuujinchou Roku' as a slightly lighter but still engaging series with strong supernatural elements and a slower, more contemplative pace. The recommendation closely aligns with the user's demonstrated preference for high-quality anime with well-developed characters and compelling storylines.",
+      "explanation": "The user's viewing history indicates a clear preference for anime with deep storylines, supernatural elements, and a focus on character development. The selected recommendations attempt to continue this trend while offering a slightly different tonal experience.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "The goal is to provide a high-quality anime with supernatural elements, strong character development, and potentially a dark or thought-provoking storyline. 'Natsume Yuujinchou Roku' ticks all of these boxes perfectly, fitting within the user's established tastes."
+    },
+    "timestamp": "2026-02-08T18:38:30.517575"
+  },
+  {
+    "username": "symonx99",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Sci-Fi"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The user is looking for anime with a focus on slice-of-life, romance, and/or supernatural elements.  Many of these recommendations (Clannad, Natsume Yuujinchou, Tokyo Ghoul, Fate/stay night) heavily lean into those genres.  The varying degrees of supernatural leanings provides flexibility for a diverse viewing experience.",
+      "explanation": "Based on the user's history of watching anime with romance, slice-of-life, and supernatural themes, these recommendations are designed to expand their viewing options within similar genres. The selections cover a range of subgenres within those broader categories \u2013 from the heartwarming slice-of-life of Clannad to the complex supernatural world of Tokyo Ghoul and the strategic battles of Fate/stay night.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "All recommendations strongly align with the user's requested genres \u2013 romance, slice-of-life, supernatural, and/or drama. They represent a significant portion of the user's existing viewing preferences and explore variations within these core themes."
+    },
+    "timestamp": "2026-02-08T18:38:42.978502"
+  },
+  {
+    "username": "symonx99",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Action",
+      "Adventure"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The user's history includes several slice-of-life, comedy, and drama anime. 'Sayonara Zetsubou Sensei' and 'NHK ni Youkoso!' share a similar comedic and slightly dark tone with a focus on character interactions and unconventional situations - highly aligned with the user's viewing history. 'Clannad: After Story' is a strong fit given the user's history with emotionally driven slice-of-life dramas. 'Free!' is a good addition given the slice of life, sports, and comedy elements.",
+      "explanation": "Based on the user\u2019s historical viewing data of slice-of-life, comedy, and drama anime, the recommendations prioritize titles that share these characteristics. The selections aim for a balance between familiar genres and explorations of character-driven narratives.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "All recommendations heavily emphasize the core genres requested \u2013 slice of life, comedy, and drama. They feature prominent comedic elements alongside character-driven storylines, aligning perfectly with the user\u2019s past preferences."
+    },
+    "timestamp": "2026-02-08T18:38:55.563512"
+  },
+  {
+    "username": "symonx99",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Action",
+      "Romance"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The user requested anime with a focus on action, supernatural, and magic. This selection offers a blend of those genres \u2013 \u2018Fate/Zero\u2019 is a complex, strategic action series with magic and supernatural elements, while \u2018D.Gray-man Hallow\u2019 is an action-packed supernatural adventure. \u2018Fate/Zero\u2019 is particularly well-regarded in the action/fantasy space, making it a strong recommendation.",
+      "explanation": "Based on the user's input, these anime recommendations are chosen based on a strong emphasis on action, supernatural, and magic. 'Fate/Zero' and 'D.Gray-man Hallow' both heavily feature these elements, aligning directly with the user's stated preferences.  The higher score reflects a good balance of action and fantasy. ",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "These recommendations strongly align with the genre goals of 'action', 'supernatural', and 'magic.' Each title's core narrative revolves around these elements \u2013 magical battles, supernatural entities, and combat fueled by magical abilities."
+    },
+    "timestamp": "2026-02-08T18:39:07.959355"
+  },
+  {
+    "username": "symonx99",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Shoujo",
+      "Romance",
+      "Military"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The user's history leans heavily toward anime with strong action, supernatural elements, and often a blend of comedy and drama.  These recommendations \u2013 *Soul Eater*, *Bungou Stray Dogs*, *Black Butler*, and *Kuroshitsuji Movie* \u2013 all fit this profile perfectly, offering intense combat, complex characters, and supernatural themes. The inclusion of *Shigatsu wa Kimi no Uso* is a solid addition, fitting the user\u2019s preference for emotionally resonant stories with mystery and fantasy.",
+      "explanation": "Based on the user's history, which consistently favored anime with action, supernatural themes, and often a blend of comedy and drama, these recommendations were selected to continue that trend. Specifically, the high scores of *Soul Eater* and *Black Butler* in their history indicate a strong preference for these genres.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "The recommendations strongly align with the user's genre goals \u2013 action, supernatural, and fantasy \u2013 as evidenced by the popularity and critical reception of these anime. *Soul Eater*, *Black Butler*, and *Kuroshitsuji* are all quintessential examples of these genres."
+    },
+    "timestamp": "2026-02-08T18:39:20.851715"
+  },
+  {
+    "username": "symonx99",
+    "model": "gemma3:latest",
+    "genre_goal": null,
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The user's history leans towards mystery, psychological, and sci-fi anime, with a preference for complex plots and strong characters. 'Danganronpa' and 'Ghost in the Shell' strongly align with these preferences. 'ReLIFE' offers a similar blend of drama, mystery, and character-driven storytelling, making it a solid recommendation.",
+      "explanation": "Based on the user's past viewing history emphasizing anime with complex plots, strong characters, and mystery elements, this selection prioritizes titles that share these qualities. The recommendations focus on anime known for their engaging narratives and intriguing mysteries, aligning with the user's demonstrated interest in intelligent and thought-provoking stories."
+    },
+    "timestamp": "2026-02-08T18:39:31.533998"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Cars"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "Based on the user's history, they've shown a strong preference for fantasy, adventure, and supernatural stories. These recommendations \u2013 Death March, ef, and the others \u2013 all firmly fall into those categories, offering intriguing premises and engaging narratives. The scores reflect a solid match to their established tastes.",
+      "explanation": "The recommendations are built around a strong fantasy/adventure base, aligning with the user\u2019s previous choices. They aim to introduce similar themes and storytelling styles while potentially expanding the user\u2019s horizons within the fantasy genre.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "All of the selected titles are core fantasy and adventure, matching the explicit genre request. The inclusion of supernatural elements, as seen in 'ef' and 'Death March,' further reinforces the genre alignment, delivering a highly successful outcome."
+    },
+    "timestamp": "2026-02-08T18:39:41.894950"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Sci-Fi"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "Based on the provided anime list, the user has a strong preference for action, sci-fi, comedy, and historical anime, particularly those with elements of parody and samurai themes. The recommendations (Vampire Hunter D, Gintama Movie 1, Gintama Movie 2, Gintama Movie 1) all fit strongly into these genres, and Gintama is a major component. It's a solid selection for someone who enjoys this kind of content.",
+      "explanation": "These recommendations were chosen because the user's history includes a significant number of anime with action, sci-fi, comedy and historical elements. 'Vampire Hunter D' and 'Gintama' are strong fits. The diversity offers a mix of genres within the user's preferences.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "The recommendations are all strongly aligned with the user's stated genre preferences (action, sci-fi, comedy, historical) and represent a high level of genre match."
+    },
+    "timestamp": "2026-02-08T18:39:52.949734"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Action",
+      "Adventure"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The user requested anime with genres like 'Shonen' and action. The provided anime recommendations \u2013 'Gintama,' '91 Days,' 'Shounen Onmyouji,' 'Kyou kara Ore wa!!', 'Gintama,' 'Shonen Onmyouji', 'Kyou kara Ore wa!!' \u2013 all strongly lean into those genres, primarily featuring action-packed stories with young male protagonists. '91 Days' is a notable departure with a darker crime drama element, but still maintains action and a strong protagonist.",
+      "explanation": "Based on the user's stated preferences, the recommendations prioritize anime strongly featuring 'Shonen' elements\u2014action-oriented stories with young male protagonists. '91 Days' and 'Gintama' provide a slightly different experience to broaden the user's options.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "All listed anime fall squarely into the requested 'Shonen' genre, featuring action, adventure, and young male protagonists. The list is heavily focused on action and adventure, directly aligning with the user's stated preference. The inclusion of 'Shounen Onmyouji' and 'Kyou kara Ore wa!!' further solidifies this focus."
+    },
+    "timestamp": "2026-02-08T18:40:05.045196"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Action",
+      "Romance"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "Based on the user's history, which primarily consists of 'One Punch Man', 'Princess Mononoke', and 'Ben-To', these recommendations \u2013 'Seraph of the End', 'Mononoke Hime', and 'Owari no Seraph: The Beginning of the End' \u2013 share similar action-oriented narratives, often with elements of fantasy, supernatural themes, and strong visual storytelling. They all fall into the action, adventure, and fantasy genres, making them good fits given the user's demonstrated preferences.",
+      "explanation": "The recommendations are chosen based on the user's history which includes action and fantasy titles, specifically 'One Punch Man', 'Princess Mononoke', and 'Ben-To'. These recommendations continue to lean into the action and fantasy elements the user appears to enjoy, expanding on the types of stories and visuals they've shown a preference for.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "The user's history heavily indicates a strong preference for action, fantasy, and visually driven stories.  'Seraph of the End', 'Mononoke Hime', and 'Owari no Seraph' all strongly align with these preferences, delivering high scores for genre match."
+    },
+    "timestamp": "2026-02-08T18:40:17.120431"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Shoujo",
+      "Romance",
+      "Military"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommendations heavily lean into anime with strong romance and supernatural elements, aligning with the user's apparent preference based on the provided titles. The inclusion of titles like \u2018Night Is Short, Walk on Girl\u2019 and \u2018Ura Tegamibachi\u2019 solidifies this focus.",
+      "explanation": "Based on the user's history, this suggests a strong preference for anime with romantic storylines, particularly those incorporating supernatural or fantastical elements. The recommendations prioritize titles with these characteristics to maximize the chance of a satisfying match.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "The recommendations are overwhelmingly focused on romance and supernatural genres, directly mirroring the user's provided title list which contains prominently these genres. The selections accurately fulfill the genre goal."
+    },
+    "timestamp": "2026-02-08T18:40:27.234361"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "gemma3:latest",
+    "genre_goal": null,
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "Given the user's history of enjoying titles like 'Berserk', 'Devil May Cry', and 'Metal Gear Rising', these recommendations focus on action-packed titles with dark themes, intense combat, and often a narrative leaning towards chaos and moral ambiguity. 'Fuse' and 'Tatakau Shisho' offer similar intense action and supernatural elements, while 'Sunabouzu' provides a unique blend of action and a post-apocalyptic setting. 'Togainu no Chi' retains the darker themes and action focus seen in 'Berserk'.",
+      "explanation": "This selection prioritizes action-oriented titles with mature themes and strong combat sequences, aligning with the user's previous preferences. The inclusion of 'Fuse' and 'Tatakau Shisho' offers similar intense and stylistic action, while 'Sunabouzu' and 'Togainu no Chi' broaden the scope with distinct settings and narratives within the action genre."
+    },
+    "timestamp": "2026-02-08T18:40:37.825049"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Cars"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "Based on the user's history, they seem to enjoy action, supernatural, and fantasy anime with a strong visual style. 'Mob Psycho 100' and 'Blood Lad' both fit this profile well, offering exciting action sequences, unique supernatural elements, and visually appealing animation. 'Wolf's Rain' also aligns with this preference, leaning heavily into a fantasy adventure with a distinctive aesthetic.",
+      "explanation": "The recommendations were made based on the user's past viewing history, which prioritized action, supernatural, and visually engaging anime.  These titles share key aspects like intense action, supernatural abilities, and distinctive artistic styles, making them a strong fit for their demonstrated tastes.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "All of the selected recommendations align perfectly with the user's stated genre goals of action, supernatural, and fantasy, offering a compelling and visually rich experience."
+    },
+    "timestamp": "2026-02-08T18:40:48.713565"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Sci-Fi"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "Given the user's history of watching titles like 'Shiki', 'Blood Lad', 'Wolf's Rain', 'Boku no Hero Academia 3rd Season' and 'Shiki', this selection reflects a clear preference for dark fantasy, supernatural action, and somewhat melancholic stories with complex themes. The listed titles align strongly with this preference. 'Blood Lad' is a particularly strong match due to its demon-themed world, action, and unique art style \u2013 consistent with the user's existing watch history.",
+      "explanation": "The recommendations are tailored based on the user\u2019s viewing history which indicates a consistent interest in dark fantasy, supernatural action and themes. The titles are selected based on these preferences to maximize the probability of the user enjoying them.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "All the recommended titles fit squarely within the requested genres \u2013 Action, Fantasy, Supernatural, and Demon. 'Shiki' and 'Blood Lad' specifically showcase a strong emphasis on dark fantasy, a common element in the user\u2019s preferred viewing history."
+    },
+    "timestamp": "2026-02-08T18:41:00.337117"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Action",
+      "Adventure"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "Based on the user's history, they seem to enjoy action-packed anime with comedic elements and sci-fi or supernatural themes. The recommendations - Code:Breaker, Gintama, and Gintama \u2013 align well with this preference, offering a mix of action, mystery, and humor, as well as incorporating sci-fi and supernatural elements. All are highly rated anime.",
+      "explanation": "The recommendations have been chosen based on the users\u2019 history which shows preference for action, comedy, sci-fi, and supernatural themes. The recommendation list caters to these preferences, offering well-known and highly rated titles.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "The recommendations successfully fulfill the requested genres of action, sci-fi, and comedy, creating a cohesive and enjoyable viewing experience for the user."
+    },
+    "timestamp": "2026-02-08T18:41:10.879356"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Action",
+      "Romance"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "Based on the user's history, the recommendations focus on anime with strong action, supernatural elements, and dramatic storylines. 'Digimon Adventure tri. Confession' and 'Owari no Seraph: The Beginning of the End' share these characteristics, aligning with a preference for intense, character-driven anime. 'Digimon Adventure tri.' provides a good balance of adventure and emotional depth, while 'Owari no Seraph' delivers a darker, more mature narrative.",
+      "explanation": "These recommendations are built on a strategy of expanding the user's viewing history within similar genres. We've prioritized titles with strong action sequences, supernatural themes, and character-driven plots - features that appear to be key in the user's past choices. These recommendations are meant to provide a deeper dive into the action/supernatural action genre.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "All three recommendations (Digimon Adventure tri. Confession, Owari no Seraph, and Tokyo Godfathers) fit perfectly with the requested genre goal of action, supernatural, and drama. They all contain significant action sequences, a strong supernatural component, and focus on dramatic character development and narrative arcs."
+    },
+    "timestamp": "2026-02-08T18:41:22.957585"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "gemma3:latest",
+    "genre_goal": [
+      "Shoujo",
+      "Romance",
+      "Military"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "Given the user's history of watching 'Danganronpa 3' and 'Blood Lad', these recommendations prioritize dark, suspenseful anime with mystery elements and supernatural themes. 'Le Chevalier D\u2019Eon' and 'D-Frag!' share a similar gothic aesthetic and focus on investigation and complex characters, aligning well with the user's established tastes.",
+      "explanation": "The recommendations are based on the user\u2019s demonstrated preference for visual novels, mystery, suspense, and supernatural anime. The shared elements of investigation, dark themes, and complex narratives driven the choices.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "All the recommended titles fall squarely within the requested genres: mystery, action, supernatural, and dark fantasy. 'Le Chevalier D\u2019Eon' and 'D-Frag!' have strong ties to the user\u2019s prior viewing, maximizing genre alignment."
+    },
+    "timestamp": "2026-02-08T18:41:33.710178"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "gemma3:latest",
+    "genre_goal": null,
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "Given the user's history, which heavily features anime with action, superhero themes, and school settings (like My Hero Academia and xxxHOLiC), these recommendations prioritize similar genres and popular titles. Nobunaga no Shinobi and Boku no Hero Academia are strong matches based on these preferences.",
+      "explanation": "The user\u2019s history indicates a strong affinity for action-packed anime, particularly those with superhero elements and prominent school settings. Therefore, these recommendations are selected to align with this established taste, offering familiar and engaging content.",
+      "output": [
+        {
+          "title": "Nobunaga no Shinobi",
+          "score": 4,
+          "reasoning": "Similar to My Hero Academia, this anime features a school setting and a protagonist learning to control superpowers.",
+          "explanation": "This recommendation directly caters to the user's existing interest in school-based superhero anime, offering a comparable experience."
+        },
+        {
+          "title": "Boku no Hero Academia",
+          "score": 5,
+          "reasoning": "This is the user\u2019s top-rated show, reflecting a perfect match for their preferences.",
+          "explanation": "As the user\u2019s favorite anime, a recommendation of this title is a logical and highly relevant continuation of their viewing history."
+        }
+      ]
+    },
+    "timestamp": "2026-02-08T18:41:46.482239"
+  },
+  {
+    "username": "symonx99",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Cars"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 5,
+      "reasoning": "The user's history includes anime like 'Durarara!!' and 'Sayonara Zetsubou Sensei' which are known for their unique blend of comedy, mystery, and supernatural elements. The recommendations include 'Durarara!!' and 'Bakemono no Ko' which share similar themes of supernatural occurrences and complex character dynamics. 'Natsume Yuujinchou Roku' also fits with its supernatural and slice-of-life elements.",
+      "explanation": "Based on the user's history of preferring anime with supernatural elements, complex characters, and a mix of comedy and mystery, the recommendations were selected to match these themes. 'Durarara!!' and 'Bakemono no Ko' were chosen for their supernatural themes and character-driven stories, while 'Natsume Yuujinchou Roku' was included for its supernatural and slice-of-life elements.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "The recommendations align perfectly with the requested genres of supernatural, comedy, and mystery. Each recommended anime contains elements of these genres, providing a cohesive and relevant selection for the user's preferences."
+    },
+    "timestamp": "2026-02-08T18:42:13.381074"
+  },
+  {
+    "username": "symonx99",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Sci-Fi"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 5,
+      "reasoning": "The user has a history of watching anime with action, supernatural, and psychological themes. The recommended series share these elements, such as 'Garo: Vanishing Line' with demons and action, 'Danganronpa 3' with psychological horror, and 'Hinamatsuri' with supernatural and comedy. These align well with the user's preferences.",
+      "explanation": "Based on the user's history of preferring action, supernatural, and psychological anime, the recommendations were selected to match these themes. Each suggested series contains elements of action and the supernatural, which are consistent with the user's past viewing habits.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "The recommendations strongly align with the requested genres of action, supernatural, and psychological themes. Each anime listed has clear elements in these categories, making them a perfect fit for the user's genre preferences."
+    },
+    "timestamp": "2026-02-08T18:42:34.156240"
+  },
+  {
+    "username": "symonx99",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Action",
+      "Adventure"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommendations include a mix of action, sci-fi, and slice-of-life genres, which align with typical anime preferences. However, some entries like 'Redline' and 'Megazone 23' have higher action and sci-fi elements that might not match the user's specific interests if they prefer more drama or comedy.",
+      "explanation": "Based on the user's history of enjoying anime with strong narratives and character development, the recommendations focus on series with deep plots and thematic richness. The selected titles offer a balance between action and storytelling, ensuring a varied yet coherent set of suggestions.",
+      "genre_goal_score": 4,
+      "genre_goal_reasoning": "The recommendations cover a broad range of genres including action, sci-fi, drama, and slice-of-life, which aligns well with the user's potential interest in diverse anime styles. However, there is a slight overemphasis on action and sci-fi, which might not fully capture the user's preferred genre mix."
+    },
+    "timestamp": "2026-02-08T18:42:56.069927"
+  },
+  {
+    "username": "symonx99",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Action",
+      "Romance"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 5,
+      "reasoning": "The user previously engaged with anime like 'Boku no Hero Academia' and 'My Hero Academia', which are action-packed, superpower-themed, and set in school environments. The recommendations include 'Boku no Hero Academia 2nd Season' (same series), 'Akashic Records of Bastard Magic Instructor' (magic and school themes), and 'Rokudenashi Majutsu Koushi to Akashic Records' (magic and school themes), aligning well with their interests.",
+      "explanation": "Based on the user's history with superpower and school-based anime, the recommendations focus on similar genres and themes to provide a cohesive and enjoyable viewing experience.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "The recommendations strongly align with the requested genres of action, superpowers, and school settings, ensuring a perfect match for the user's preferences."
+    },
+    "timestamp": "2026-02-08T18:43:17.037467"
+  },
+  {
+    "username": "symonx99",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Shoujo",
+      "Romance",
+      "Military"
+    ],
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 5,
+      "reasoning": "The recommendations are all anime with high scores and similar themes to the user's history, including psychological, military, and drama elements.",
+      "explanation": "Based on the user's history of watching anime with deep psychological themes and military or action-oriented plots, the recommendations include titles like 'Ghost in the Shell: Stand Alone Complex' and 'Jin-Roh: The Wolf Brigade' which share similar genres and themes.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "The recommendations closely align with the requested genres of psychological, military, and drama anime, providing a cohesive and relevant selection for the user."
+    },
+    "timestamp": "2026-02-08T18:43:35.611548"
+  },
+  {
+    "username": "symonx99",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": null,
+    "history_count": 88,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 5,
+      "reasoning": "The user's history includes 'JoJo no Kimyou na Bouken: Diamond wa Kudakenai' which is part of the JoJo's Bizarre Adventure series. The recommendation includes the same series, indicating a strong thematic and genre similarity.",
+      "explanation": "The recommendation is based on the user's history of watching JoJo no Kimyou na Bouken: Diamond wa Kudakenai, suggesting they might enjoy other parts of the JoJo series due to shared themes and style."
+    },
+    "timestamp": "2026-02-08T18:43:53.868892"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Cars"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 5,
+      "reasoning": "The user's history shows a preference for anime with comedic and action elements, particularly those with a mix of historical and sci-fi settings. 'Gintama' and 'Glass no Kamen' are both known for their unique blend of humor, action, and dramatic storytelling. 'Gintama' is a long-running series with a strong fan base, and 'Glass no Kamen' has a similar appeal with its dramatic and comedic elements.",
+      "explanation": "Based on the user's history of enjoying 'Gintama' and 'Glass no Kamen', the recommendations focus on similar anime that combine action, comedy, and historical or sci-fi settings. These recommendations aim to provide a consistent viewing experience that matches the user's preferences.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "The recommendations align perfectly with the requested genres of action, comedy, and historical/sci-fi settings. Each recommended anime matches these genres, ensuring a cohesive and enjoyable experience for the user."
+    },
+    "timestamp": "2026-02-08T18:44:14.824417"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Sci-Fi"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommendations include a mix of action, drama, and sci-fi elements that align with the user's history of watching similar genres. Titles like 'Gintama' and 'Guilty Crown' have high scores and fit the action/sci-fi themes.",
+      "explanation": "Based on the user's history of watching action and sci-fi anime, the recommendations focus on similar genres. The selected titles have high ratings and thematic elements that match the user's preferences.",
+      "genre_goal_score": 4,
+      "genre_goal_reasoning": "The recommendations strongly align with action, sci-fi, and drama genres, which are likely the user's preferred categories. However, there is some variation in the sub-genres, which slightly affects the score."
+    },
+    "timestamp": "2026-02-08T18:44:33.621759"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Action",
+      "Adventure"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommendations include a mix of comedy, fantasy, and romance genres, which align with the user's previous interactions. Titles like 'Yoru wa Mijikashi Arukeyo Otome' and 'Death March kara Hajimaru Isekai Kyousoukyoku' offer diverse experiences that match the user's interest in engaging narratives.",
+      "explanation": "Based on the user's history of engaging with various anime genres, the recommendations aim to provide a balanced mix of comedy, fantasy, and romance to cater to different tastes while ensuring a cohesive selection.",
+      "genre_goal_score": 4,
+      "genre_goal_reasoning": "The recommendations cover multiple genres, including comedy, fantasy, and romance, which aligns well with the user's stated interests. However, there is room for more specific alignment with the user's preferred sub-genres."
+    },
+    "timestamp": "2026-02-08T18:44:53.774766"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Action",
+      "Romance"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommendations include several action, fantasy, and supernatural titles, which align with the user's history of preferring similar genres. However, some entries have lower scores or different themes that might not fully match the user's preferences.",
+      "explanation": "Based on the user's history, the recommendations focus on action, fantasy, and supernatural elements, which are common in their preferred genres. The selected titles offer a mix of adventure, magic, and dramatic storytelling, which are likely to appeal to the user's interests.",
+      "genre_goal_score": 4,
+      "genre_goal_reasoning": "The recommendations strongly align with action, fantasy, and supernatural genres, which are the primary focus. However, some titles may have varying sub-genres or themes that slightly deviate from the core genre goals."
+    },
+    "timestamp": "2026-02-08T18:45:12.843933"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Shoujo",
+      "Romance",
+      "Military"
+    ],
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 3,
+      "reasoning": "The recommendations include a mix of action, fantasy, and drama, which aligns somewhat with the user's history of enjoying anime with intense storytelling and thematic depth. However, some entries like 'Prison School OVA' and 'Glass no Kamen' don't match the user's likely interests in action-packed narratives.",
+      "explanation": "Based on the user's history, the recommendations were made to include a variety of anime with strong narratives and thematic elements similar to the user's preferences. The selection includes action, fantasy, and drama genres, which are common in the user's watchlist.",
+      "genre_goal_score": 3,
+      "genre_goal_reasoning": "The recommendations cover multiple genres including action, fantasy, and drama, which are relevant to the user's interests. However, there is a lack of consistency in matching the specific genres the user might be looking for, leading to a moderate score."
+    },
+    "timestamp": "2026-02-08T18:45:33.027314"
+  },
+  {
+    "username": "MrPeanut02",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": null,
+    "history_count": 18,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 5,
+      "reasoning": "The user has a history of watching anime with complex narratives and psychological themes. The recommendations include titles like 'Rozen Maiden: Ouvert\u00fcre' and 'Texhnolyze' which have deep storylines and character-driven plots. These anime also share similar genres such as drama, action, and psychological elements, making them a good fit for the user's preferences.",
+      "explanation": "Based on the user's history of preferring anime with intricate plots and psychological depth, the recommendations were selected to align with these interests. The chosen titles offer layered storytelling and thematic complexity that match the user's past viewing patterns."
+    },
+    "timestamp": "2026-02-08T18:45:50.558200"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Cars"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommendations include a mix of action, fantasy, and supernatural genres, which align with the user's history of preferring anime with these elements. Titles like 'Wolf's Rain' and 'K' have strong action and supernatural themes, while 'Amagi Brilliant Park' offers a unique blend of comedy and magic.",
+      "explanation": "Based on the user's history, the recommendations focus on action, fantasy, and supernatural genres. The selected anime share thematic similarities such as mythical creatures, adventure, and unique world-building, which are likely to appeal to the user's preferences.",
+      "genre_goal_score": 4,
+      "genre_goal_reasoning": "The recommendations strongly align with action, fantasy, and supernatural genres. However, there is a slight variation in the tone and style, such as the comedic elements in 'Amagi Brilliant Park' and 'D.Gray-man', which may not perfectly match the user's specific genre preferences."
+    },
+    "timestamp": "2026-02-08T18:46:11.340044"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Sci-Fi"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 5,
+      "reasoning": "The recommendations are all high-quality anime with strong action and adventure themes, similar to the user's previous preferences.",
+      "explanation": "Based on the user's history of enjoying action and adventure anime, the recommendations include titles like Hunter x Hunter and Fullmetal Alchemist, which are popular in those genres.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "All recommended anime fit the action and adventure genre, aligning perfectly with the user's stated preferences."
+    },
+    "timestamp": "2026-02-08T18:46:27.800007"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Action",
+      "Adventure"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 5,
+      "reasoning": "The recommendations are all anime titles with high scores, matching the user's possible preference for popular and well-received series. The genres include action, adventure, comedy, and fantasy, which are common in anime and likely align with the user's interests.",
+      "explanation": "Based on the user's history of engaging with anime titles across various genres, the recommendations focus on popular and critically acclaimed series that span action, adventure, comedy, and fantasy. These genres are consistent with typical anime preferences, ensuring a strong match for the user's tastes.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "The recommendations closely align with the requested genres of action, adventure, comedy, and fantasy, providing a diverse yet cohesive selection that caters to a broad range of anime preferences."
+    },
+    "timestamp": "2026-02-08T18:46:47.061107"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Action",
+      "Romance"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 4,
+      "reasoning": "The recommendations include 'My Hero Academia' and 'Boku no Hero Academia' which are directly related to the user's interest in hero-themed anime. Other titles like 'One Piece Recap' and 'Gintama' also fit the action and adventure genres, but some entries like 'Tokyo Godfathers' are more drama-focused, which might not align perfectly.",
+      "explanation": "Based on the user's history of preferring anime with action, adventure, and hero themes, the recommendations include titles that match these elements. 'My Hero Academia' is a direct match, while others like 'One Piece' and 'Gintama' offer similar adventurous and comedic elements.",
+      "genre_goal_score": 4,
+      "genre_goal_reasoning": "The recommendations cover a range of action, adventure, and comedy genres, which aligns well with typical hero and adventure anime. However, some entries like 'Tokyo Godfathers' are more drama-oriented, slightly deviating from the primary genre focus."
+    },
+    "timestamp": "2026-02-08T18:47:08.648918"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": [
+      "Shoujo",
+      "Romance",
+      "Military"
+    ],
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 5,
+      "reasoning": "The user has a history of watching anime with similar genres such as action, comedy, school, and shounen. The recommendations include titles like 'My Hero Academia' and 'Boku no Hero Academia,' which are directly related to the user's preferences. Additionally, the recommendations include other anime with similar themes, such as 'One Piece Recap' and 'Osomatsu-san,' which have elements of comedy and school life.",
+      "explanation": "Based on the user's history of watching anime with action, comedy, school, and shounen genres, the recommendations were made to include titles that match these categories. The selected anime have similar themes and styles to what the user has previously enjoyed.",
+      "genre_goal_score": 5,
+      "genre_goal_reasoning": "The recommendations are highly aligned with the requested genres of action, comedy, school, and shounen. Each recommended title falls into at least one of these genres, ensuring that the user gets content that matches their interests."
+    },
+    "timestamp": "2026-02-08T18:47:30.014827"
+  },
+  {
+    "username": "Zlaftor",
+    "model": "qwen3:30b-a3b",
+    "genre_goal": null,
+    "history_count": 33,
+    "recommendations_count": 10,
+    "evaluation": {
+      "score": 5,
+      "reasoning": "The user has a history of enjoying anime with strong character development and emotional depth. 'Mob Psycho 100' and 'Boku no Hero Academia 2nd Season' both feature protagonists with personal growth and unique abilities, aligning well with the user's preferences.",
+      "explanation": "Based on the user's history of engaging with series that emphasize character arcs and thematic depth, these recommendations focus on anime that offer similar narrative structures and emotional resonance."
+    },
+    "timestamp": "2026-02-08T18:47:46.367480"
+  }
+]

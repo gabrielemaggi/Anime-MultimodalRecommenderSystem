@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from collections import defaultdict
 from datetime import datetime
@@ -26,6 +27,7 @@ MODELS_TO_TEST = [
 USERS_TO_TEST = [
     "symonx99",
     "MrPeanut02",
+    "Zlaftor",
     # Add more usernames here
 ]
 
@@ -33,6 +35,8 @@ GENRE_GOALS_TO_TEST = [
     ["Cars"],
     ["Sci-Fi"],
     ["Action", "Adventure"],
+    ["Action", "Romance"],
+    ["Shoujo", "Romance", "Military"],
     None,  # Test without genre goal
 ]
 
@@ -42,55 +46,126 @@ OUTPUT_DIR = Path("./evaluation_results")
 K_RECOMMENDATIONS = 10
 
 # ============================================================================
+# LOGGING SETUP
+# ============================================================================
+
+
+def setup_logging():
+    """Configure logging with both file and console handlers"""
+    # Create logs directory
+    log_dir = OUTPUT_DIR / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    # Generate timestamp for log file
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_dir / f"evaluation_{timestamp}.log"
+
+    # Create logger
+    logger = logging.getLogger("AnimeEvaluation")
+    logger.setLevel(logging.DEBUG)
+
+    # Remove existing handlers
+    logger.handlers.clear()
+
+    # File handler - detailed logging
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    file_formatter = logging.Formatter(
+        "%(asctime)s | %(levelname)-8s | %(funcName)-25s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    file_handler.setFormatter(file_formatter)
+
+    # Console handler - important messages only
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_formatter = logging.Formatter("%(levelname)s: %(message)s")
+    console_handler.setFormatter(console_formatter)
+
+    # Add handlers
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+    logger.info(f"Logging initialized. Log file: {log_file}")
+
+    return logger
+
+
+# Initialize logger
+logger = setup_logging()
+
+# ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
 
 def get_user_history(user, index):
     """Get user's watch history"""
+    logger.debug(f"Fetching watch history for user: {user.id}")
     result = []
-    for id, score in user.get_watchList():
-        data = index.get_anime_info_by_id(id)
-        result.append(
-            {
-                "title": data["title"],
-                "genre": data["genre"],
-                "studio": data["studio"],
-                "sypnopsis": data["sypnopsis"],
-            }
-        )
-    return result
+
+    try:
+        for id, score in user.get_watchList():
+            data = index.get_anime_info_by_id(id)
+            result.append(
+                {
+                    "title": data["title"],
+                    "genre": data["genre"],
+                    "studio": data["studio"],
+                    "sypnopsis": data["sypnopsis"],
+                }
+            )
+        logger.debug(f"Retrieved {len(result)} items from watch history")
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching user history: {e}", exc_info=True)
+        return []
 
 
 def my_recommender_system(user, index, k=10, genre_goal=None, studio_goal=None):
     """Modified recommender that can optionally filter by genre goal"""
-    user.findCentersOfClusters(index)
+    logger.debug(
+        f"Running recommender for user: {user.id}, k={k}, genre_goal={genre_goal}"
+    )
 
-    if genre_goal is not None:
-        results = index.encode_tabular_genre_studio(
-            genres=genre_goal, studios=studio_goal
-        )
-        for gen in genre_goal:
-            embedding = results.get("genres").get(gen)
-            query = index.align_embedding(embedding, modality="tab")
-            user.add_filtering(query, "move")
+    try:
+        user.findCentersOfClusters(index)
 
-    if studio_goal is not None:
-        results = index.encode_tabular_genre_studio(
-            genres=genre_goal, studios=studio_goal
-        )
-        for stu in studio_goal:
-            embedding = results.get("studios").get(stu)
-            query = index.align_embedding(embedding, modality="tab")
-            user.add_filtering(query, "move")
+        if genre_goal is not None:
+            logger.debug(f"Applying genre filtering: {genre_goal}")
+            results = index.encode_tabular_genre_studio(
+                genres=genre_goal, studios=studio_goal
+            )
+            for gen in genre_goal:
+                embedding = results.get("genres").get(gen)
+                query = index.align_embedding(embedding, modality="tab")
+                user.add_filtering(query, "move")
 
-    return user.get_nearest_anime_from_clusters(index, k)
+        if studio_goal is not None:
+            logger.debug(f"Applying studio filtering: {studio_goal}")
+            results = index.encode_tabular_genre_studio(
+                genres=genre_goal, studios=studio_goal
+            )
+            for stu in studio_goal:
+                embedding = results.get("studios").get(stu)
+                query = index.align_embedding(embedding, modality="tab")
+                user.add_filtering(query, "move")
+
+        recommendations = user.get_nearest_anime_from_clusters(index, k)
+        logger.debug(f"Generated {len(recommendations)} recommendations")
+        return recommendations
+
+    except Exception as e:
+        logger.error(f"Error in recommender system: {e}", exc_info=True)
+        return []
 
 
 def evaluate_recommendation_with_ollama(
     model_name, history, recommendation, genre_goal=None
 ):
     """Constructs the prompt and asks Ollama for a consistency score."""
+    logger.debug(f"Requesting evaluation from model: {model_name}")
+
     history_str = json.dumps(history, indent=2)
     rec_str = json.dumps(recommendation, indent=2)
 
@@ -133,10 +208,10 @@ def evaluate_recommendation_with_ollama(
     {'- "genre_goal_reasoning": explain how well the recommendations align with the requested genres.' if genre_goal else ""}
     """
 
-    print(f"  🔄 Requesting evaluation from {model_name}...")
     client = ollama.Client(host=OLLAMA_HOST)
 
     try:
+        logger.debug(f"Sending evaluation request to {model_name}")
         response = client.chat(
             model=model_name,
             messages=[
@@ -146,16 +221,23 @@ def evaluate_recommendation_with_ollama(
         )
         content = response["message"]["content"]
         result = json.loads(content)
+
+        logger.info(
+            f"✓ Evaluation complete - Score: {result.get('score', 0)}/5 (Model: {model_name})"
+        )
+        logger.debug(f"Evaluation reasoning: {result.get('reasoning', 'N/A')}")
+
         return result
+
     except json.JSONDecodeError as e:
-        print(f"  ❌ JSON decode error: {e}")
+        logger.error(f"JSON decode error from {model_name}: {e}", exc_info=True)
         return {
             "score": 0,
             "reasoning": "Error: Model did not return valid JSON.",
             "error": str(e),
         }
     except Exception as e:
-        print(f"  ❌ Generic error: {e}")
+        logger.error(f"Error communicating with {model_name}: {e}", exc_info=True)
         return {"score": 0, "reasoning": f"Generic Error: {str(e)}", "error": str(e)}
 
 
@@ -166,8 +248,8 @@ def evaluate_recommendation_with_ollama(
 
 def evaluate_single_user_model(model_name, username, index, genre_goal=None):
     """Evaluate a single user with a single model"""
-    print(f"\n  📊 Evaluating {username} with {model_name}")
-    print(f"     Genre Goal: {genre_goal if genre_goal else 'None'}")
+    genre_desc = f"{genre_goal}" if genre_goal else "None"
+    logger.info(f"Evaluating: User={username}, Model={model_name}, Genre={genre_desc}")
 
     try:
         # Load user
@@ -175,8 +257,10 @@ def evaluate_single_user_model(model_name, username, index, genre_goal=None):
         history = get_user_history(user, index)
 
         if len(history) == 0:
-            print(f"  ⚠️  User {username} has no watch history")
+            logger.warning(f"User {username} has no watch history - skipping")
             return None
+
+        logger.debug(f"User {username} has {len(history)} items in history")
 
         # Get recommendations
         recommendations = my_recommender_system(
@@ -184,8 +268,10 @@ def evaluate_single_user_model(model_name, username, index, genre_goal=None):
         )
 
         if len(recommendations) == 0:
-            print(f"  ⚠️  No recommendations generated for {username}")
+            logger.warning(f"No recommendations generated for {username} - skipping")
             return None
+
+        logger.debug(f"Generated {len(recommendations)} recommendations for {username}")
 
         # Evaluate
         evaluation = evaluate_recommendation_with_ollama(
@@ -202,11 +288,18 @@ def evaluate_single_user_model(model_name, username, index, genre_goal=None):
             "timestamp": datetime.now().isoformat(),
         }
 
-        print(f"  ✅ Score: {evaluation.get('score', 0)}/5")
+        score = evaluation.get("score", 0)
+        logger.info(f"✓ Completed: {username} | {model_name} | Score: {score}/5")
+
+        # Log detailed results
+        logger.debug(f"Full evaluation result: {json.dumps(result, indent=2)}")
+
         return result
 
     except Exception as e:
-        print(f"  ❌ Error evaluating {username}: {e}")
+        logger.error(
+            f"Error evaluating {username} with {model_name}: {e}", exc_info=True
+        )
         return {
             "username": username,
             "model": model_name,
@@ -218,19 +311,31 @@ def evaluate_single_user_model(model_name, username, index, genre_goal=None):
 
 def run_batch_evaluation():
     """Run evaluation across all users and models"""
-    print("\n" + "=" * 80)
-    print("🚀 BATCH EVALUATION: MULTIPLE USERS × MULTIPLE MODELS")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info("STARTING BATCH EVALUATION: MULTIPLE USERS × MULTIPLE MODELS")
+    logger.info("=" * 80)
 
     # Create output directory
     OUTPUT_DIR.mkdir(exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    # Log configuration
+    logger.info(f"Configuration:")
+    logger.info(f"  Models: {MODELS_TO_TEST}")
+    logger.info(f"  Users: {USERS_TO_TEST}")
+    logger.info(f"  Genre Goals: {GENRE_GOALS_TO_TEST}")
+    logger.info(f"  K Recommendations: {K_RECOMMENDATIONS}")
+    logger.info(f"  Ollama Host: {OLLAMA_HOST}")
+
     # Initialize index once
-    print("\n📚 Loading vector database...")
-    index = Indexing()
-    index.load_vector_database()
-    print("✅ Database loaded")
+    logger.info("Loading vector database...")
+    try:
+        index = Indexing()
+        index.load_vector_database()
+        logger.info("✓ Vector database loaded successfully")
+    except Exception as e:
+        logger.critical(f"Failed to load vector database: {e}", exc_info=True)
+        raise
 
     # Store all results
     all_results = []
@@ -242,15 +347,21 @@ def run_batch_evaluation():
     )
     current = 0
 
+    logger.info(f"Total evaluations to run: {total_combinations}")
+    logger.info("=" * 80)
+
     for model_name in MODELS_TO_TEST:
-        print(f"\n{'=' * 80}")
-        print(f"🤖 MODEL: {model_name}")
-        print(f"{'=' * 80}")
+        logger.info("")
+        logger.info("=" * 80)
+        logger.info(f"MODEL: {model_name}")
+        logger.info("=" * 80)
+
+        model_start_time = time.time()
 
         for username in USERS_TO_TEST:
             for genre_goal in GENRE_GOALS_TO_TEST:
                 current += 1
-                print(f"\n[{current}/{total_combinations}] ", end="")
+                logger.info(f"[{current}/{total_combinations}] Starting evaluation...")
 
                 result = evaluate_single_user_model(
                     model_name, username, index, genre_goal
@@ -259,32 +370,63 @@ def run_batch_evaluation():
                 if result:
                     all_results.append(result)
                     results_by_model[model_name].append(result)
+                    logger.debug(
+                        f"Result added to collection. Total results: {len(all_results)}"
+                    )
+                else:
+                    logger.warning(f"No result returned for this evaluation")
 
                 # Small delay to avoid overwhelming the server
                 time.sleep(1)
 
+        model_elapsed = time.time() - model_start_time
+        logger.info(f"Model {model_name} completed in {model_elapsed:.2f} seconds")
+
     # Save detailed results
+    logger.info("=" * 80)
+    logger.info("Saving results...")
+
     detailed_output = OUTPUT_DIR / f"detailed_results_{timestamp}.json"
-    with open(detailed_output, "w") as f:
-        json.dump(all_results, f, indent=2)
-    print(f"\n💾 Detailed results saved to: {detailed_output}")
+    try:
+        with open(detailed_output, "w") as f:
+            json.dump(all_results, f, indent=2)
+        logger.info(f"✓ Detailed results saved: {detailed_output}")
+    except Exception as e:
+        logger.error(f"Failed to save detailed results: {e}", exc_info=True)
 
     # Compute and save statistics
-    statistics = compute_statistics(results_by_model)
-    stats_output = OUTPUT_DIR / f"statistics_{timestamp}.json"
-    with open(stats_output, "w") as f:
-        json.dump(statistics, f, indent=2)
-    print(f"💾 Statistics saved to: {stats_output}")
+    logger.info("Computing statistics...")
+    try:
+        statistics = compute_statistics(results_by_model)
+        stats_output = OUTPUT_DIR / f"statistics_{timestamp}.json"
+        with open(stats_output, "w") as f:
+            json.dump(statistics, f, indent=2)
+        logger.info(f"✓ Statistics saved: {stats_output}")
+        logger.debug(f"Statistics: {json.dumps(statistics, indent=2)}")
+    except Exception as e:
+        logger.error(f"Failed to compute/save statistics: {e}", exc_info=True)
+        statistics = {}
 
     # Generate and save summary
-    summary = generate_summary(statistics)
-    summary_output = OUTPUT_DIR / f"summary_{timestamp}.txt"
-    with open(summary_output, "w") as f:
-        f.write(summary)
-    print(f"💾 Summary saved to: {summary_output}")
+    logger.info("Generating summary...")
+    try:
+        summary = generate_summary(statistics)
+        summary_output = OUTPUT_DIR / f"summary_{timestamp}.txt"
+        with open(summary_output, "w") as f:
+            f.write(summary)
+        logger.info(f"✓ Summary saved: {summary_output}")
 
-    # Print summary to console
-    print("\n" + summary)
+        # Print summary to console
+        print("\n" + summary)
+
+    except Exception as e:
+        logger.error(f"Failed to generate/save summary: {e}", exc_info=True)
+
+    logger.info("=" * 80)
+    logger.info(f"BATCH EVALUATION COMPLETED")
+    logger.info(f"Total evaluations: {len(all_results)}")
+    logger.info(f"Results directory: {OUTPUT_DIR}")
+    logger.info("=" * 80)
 
     return all_results, statistics
 
@@ -296,9 +438,12 @@ def run_batch_evaluation():
 
 def compute_statistics(results_by_model):
     """Compute mean and std for each model"""
+    logger.info("Computing statistics for all models...")
     statistics = {}
 
     for model_name, results in results_by_model.items():
+        logger.debug(f"Computing statistics for {model_name}")
+
         # Extract scores
         scores = []
         genre_goal_scores = []
@@ -321,7 +466,7 @@ def compute_statistics(results_by_model):
                     genre_goal_scores.append(genre_score)
 
         # Compute statistics
-        statistics[model_name] = {
+        stats = {
             "total_evaluations": len(results),
             "successful_evaluations": len(scores),
             "errors": errors,
@@ -340,11 +485,21 @@ def compute_statistics(results_by_model):
             "all_genre_goal_scores": genre_goal_scores,
         }
 
+        statistics[model_name] = stats
+
+        logger.info(
+            f"  {model_name}: Mean={stats['score_mean']:.2f}, "
+            f"Std={stats['score_std']:.2f}, "
+            f"Success={stats['successful_evaluations']}/{stats['total_evaluations']}"
+        )
+
     return statistics
 
 
 def generate_summary(statistics):
     """Generate a text summary of the evaluation"""
+    logger.debug("Generating summary report...")
+
     summary = []
     summary.append("=" * 80)
     summary.append("📊 BATCH EVALUATION SUMMARY")
@@ -404,21 +559,22 @@ def generate_summary(statistics):
     summary.append("💡 CRITICAL ANALYSIS")
     summary.append("=" * 80)
 
-    best_model = sorted_models[0]
-    worst_model = sorted_models[-1]
+    if sorted_models:
+        best_model = sorted_models[0]
+        worst_model = sorted_models[-1]
 
-    summary.append(f"\n✅ Best Performing Model: {best_model[0]}")
-    summary.append(f"   Mean Score: {best_model[1]['score_mean']:.2f}")
-    summary.append(f"   Consistency (Std): {best_model[1]['score_std']:.2f}")
+        summary.append(f"\n✅ Best Performing Model: {best_model[0]}")
+        summary.append(f"   Mean Score: {best_model[1]['score_mean']:.2f}")
+        summary.append(f"   Consistency (Std): {best_model[1]['score_std']:.2f}")
 
-    summary.append(f"\n❌ Worst Performing Model: {worst_model[0]}")
-    summary.append(f"   Mean Score: {worst_model[1]['score_mean']:.2f}")
-    summary.append(f"   Consistency (Std): {worst_model[1]['score_std']:.2f}")
+        summary.append(f"\n❌ Worst Performing Model: {worst_model[0]}")
+        summary.append(f"   Mean Score: {worst_model[1]['score_mean']:.2f}")
+        summary.append(f"   Consistency (Std): {worst_model[1]['score_std']:.2f}")
 
-    # Consistency analysis
-    most_consistent = min(sorted_models, key=lambda x: x[1]["score_std"])
-    summary.append(f"\n🎯 Most Consistent Model: {most_consistent[0]}")
-    summary.append(f"   Std Dev: {most_consistent[1]['score_std']:.2f}")
+        # Consistency analysis
+        most_consistent = min(sorted_models, key=lambda x: x[1]["score_std"])
+        summary.append(f"\n🎯 Most Consistent Model: {most_consistent[0]}")
+        summary.append(f"   Std Dev: {most_consistent[1]['score_std']:.2f}")
 
     # Score distribution
     summary.append("\n" + "=" * 80)
@@ -439,6 +595,7 @@ def generate_summary(statistics):
 
     summary.append("\n" + "=" * 80)
 
+    logger.debug("Summary generation complete")
     return "\n".join(summary)
 
 
@@ -461,10 +618,28 @@ if __name__ == "__main__":
 
     input("\nPress ENTER to start the batch evaluation...")
 
-    start_time = time.time()
-    all_results, statistics = run_batch_evaluation()
-    elapsed_time = time.time() - start_time
+    logger.info("=" * 80)
+    logger.info("BATCH EVALUATION STARTED")
+    logger.info("=" * 80)
 
-    print(f"\n⏱️  Total execution time: {elapsed_time:.2f} seconds")
-    print(f"✅ Batch evaluation completed!")
-    print(f"📁 Results saved in: {OUTPUT_DIR}")
+    start_time = time.time()
+
+    try:
+        all_results, statistics = run_batch_evaluation()
+        elapsed_time = time.time() - start_time
+
+        logger.info(f"Total execution time: {elapsed_time:.2f} seconds")
+        logger.info(
+            f"Average time per evaluation: {elapsed_time / len(all_results):.2f} seconds"
+        )
+        logger.info("✓ Batch evaluation completed successfully!")
+        logger.info(f"Results directory: {OUTPUT_DIR}")
+
+        print(f"\n⏱️  Total execution time: {elapsed_time:.2f} seconds")
+        print(f"✅ Batch evaluation completed!")
+        print(f"📁 Results saved in: {OUTPUT_DIR}")
+
+    except Exception as e:
+        logger.critical(f"Batch evaluation failed: {e}", exc_info=True)
+        print(f"\n❌ Evaluation failed! Check logs for details.")
+        raise
