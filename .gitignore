@@ -12,6 +12,8 @@ Embeddings/
 # C extensions
 *.so
 
+users_db.json
+
 # dataset nico
 dataset
 anime_poster_embeddings.npy
